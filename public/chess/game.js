@@ -1,5 +1,7 @@
-import { socket } from "../index.js";
-const board = document.querySelector(".board");
+import { socket } from "../networking.js";
+const board = document.createElement("div");
+board.classList.add("board");
+const gameWindow = document.querySelector(".game-window");
 
 const initialPositions = {
     '0,0': 'bR', '0,1': 'bN', '0,2': 'bB', '0,3': 'bQ',
@@ -95,6 +97,10 @@ const colors = {
 let selectedSquare = null;
 let handPiece = null;
 let myTurn = false;
+let kingChecked = false;
+
+let blockingMoves = [];
+
 
 function forEachSquare(callback) {
     document.querySelectorAll(".square").forEach(square => {
@@ -147,20 +153,41 @@ function getSquare(row, col) {
     return document.querySelector(`.square[data-row="${row}"][data-col="${col}"]`);
 }
 
-function markMovableSquares(selectedSquare, row, col, playerSideCode) {
+function markMovableSquares(selectedSquare, row, col, playerSideCode, simulation = false) {
     const enemySideCode = playerSideCode === "w" ? "b" : "w";
     const pieceName = selectedSquare.dataset.piece[1];
     const data = movableSquares[pieceName];
 
+    if (blockingMoves.length > 0 && simulation === false) {
+        forEachSquare((square) => {
+            square.dataset.moveable = 0;
+        });
+        removeCircles();
+        blockingMoves.forEach(move => {
+            if (move.from.row == row && move.from.col == col) {
+                const square = getSquare(move.to.row, move.to.col);
+
+                markWithCircle(square);
+                square.dataset.moveable = 1;
+            }
+        })
+
+        return;
+    }
+
+
     if (data.recursive) {
         for (const [dx, dy] of data.directions) {
+            let foundEnemy = false;
             for (let i = 1; i < 8; i++) {
                 const x = col + i * dx;
                 const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7) break;
+                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
 
                 const square = getSquare(y, x);
+
                 if (square.dataset.piece[0] === playerSideCode) break;
+                if (square.dataset.piece[0] === enemySideCode) foundEnemy = true;
 
                 markWithCircle(square);
                 square.dataset.moveable = 1;
@@ -181,7 +208,9 @@ function markMovableSquares(selectedSquare, row, col, playerSideCode) {
                 square.dataset.moveable = 1;
             }
 
-            if (pieceName == "P") {
+            const pawnRow = playerSideCode === "w" ? 6 : 1;
+
+            if (pieceName == "P" && !(row === pawnRow && (y == 4 || y == 3))) {
                 const topLeftSquare = getSquare(y, x - 1)
                 if (topLeftSquare && topLeftSquare.dataset.piece[0] === enemySideCode) {
                     markWithCircle(topLeftSquare);
@@ -193,7 +222,58 @@ function markMovableSquares(selectedSquare, row, col, playerSideCode) {
                     topRightSquare.dataset.moveable = 1;
                 }
             }
+
+            if (pieceName == "P" && (row != pawnRow || square.dataset.piece !== "0")) return;
+        }
+    }
+}
+
+function markEnemyAttackingSquares(square, row, col, playerSideCode) {
+    const enemySideCode = playerSideCode === "w" ? "b" : "w";
+    const pieceName = square.dataset.piece[1];
+    const data = movableSquares[pieceName];
+
+    if (data.recursive) {
+        for (const [dx, dy] of data.directions) {
+            let foundEnemy = false;
+            for (let i = 1; i < 8; i++) {
+                const x = col + i * dx;
+                const y = row + i * dy;
+                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
+
+                const square = getSquare(y, x);
+                if (square.dataset.piece[0] === playerSideCode) break;
+                if (square.dataset.piece[0] === enemySideCode) foundEnemy = true;
+
+                square.dataset.attacked = 1;
+            }
+        }
+    } else {
+        for (const [dx, dy] of data.directions) {
+            const inverted = playerSideCode === "w" ? 1 : -1;
+            const x = col + (dx) * inverted;
+            const y = row + (dy) * inverted;
+            if (x < 0 || x > 7 || y < 0 || y > 7) continue;
+
+            const square = getSquare(y, x);
+            if (square.dataset.piece[0] === playerSideCode) continue;
+
+            if (pieceName != "P" && square.dataset.piece[0] != enemySideCode) {
+                square.dataset.attacked = 1;
+            }
+
             const pawnRow = playerSideCode === "w" ? 6 : 1;
+
+            if (pieceName == "P" && row != pawnRow) {
+                const topLeftSquare = getSquare(y, x - 1)
+                if (topLeftSquare && topLeftSquare.dataset.piece[0] === enemySideCode) {
+                    topLeftSquare.dataset.attacked = 1;
+                }
+                const topRightSquare = getSquare(y, x + 1)
+                if (topRightSquare && topRightSquare.dataset.piece[0] === enemySideCode) {
+                    topRightSquare.dataset.attacked = 1;;
+                }
+            }
             if (pieceName == "P" && row != pawnRow) return;
         }
     }
@@ -235,6 +315,123 @@ function removeHighlights() {
     })
 }
 
+export function markWhatEnemyCanAttack(enemySideCode) {
+    const playerSideCode = enemySideCode === "w" ? "b" : "w";
+    
+    // First, reset all attacked squares
+    forEachSquare((square) => {
+        square.dataset.attacked = 0;
+    });
+
+    // Mark squares attacked by enemy
+    forEachSquare((square, row, col) => {
+        if (square.dataset.piece[0] === enemySideCode) {
+            markEnemyAttackingSquares(square, row, col, enemySideCode);
+        }
+    });
+
+    let checked = false;
+    let checkMated = false;
+    let kingCanMove = false;
+    let kingSquare = null;
+
+    // Find if player king is in check and if it can move
+    forEachSquare((square, row, col) => {
+        if (square.dataset.piece === (playerSideCode + "K")) {
+            kingSquare = square;
+            if (square.dataset.attacked === "1") {
+                checked = true;
+                console.log("checked!")
+                
+                movableSquares.K.directions.forEach(([dx, dy]) => {
+                    const newRow = parseInt(square.dataset.row) + dy;
+                    const newCol = parseInt(square.dataset.col) + dx;
+                    const target = getSquare(newRow, newCol);
+                    
+                    if (target && target.dataset.piece[0] !== playerSideCode && target.dataset.attacked === "0") {
+                        kingCanMove = true;
+                        blockingMoves.push({
+                            from: {row: parseInt(square.dataset.row), col: parseInt(square.dataset.col)},
+                            to: {row: newRow, col: newCol}
+                        })
+                    }
+                });
+            }
+        }
+    });
+
+    if (!checked) {
+        kingChecked = false;
+        return;
+    }
+
+    // If king can move, it's not checkmate
+    if (kingCanMove) {
+        checkMated = false;
+    }
+
+    // Else, check if other pieces can block or capture
+    let blockingPossible = false;
+
+    forEachSquare((square, row, col) => {
+        if (square.dataset.piece[0] === playerSideCode && square.dataset.piece[1] !== "K") {
+            markMovableSquares(square, row, col, playerSideCode, true);
+            removeCircles();
+            forEachSquare((target) => {
+                if (target.dataset.moveable === "1") {
+                    // Simulate move
+                    const originalPiece = target.dataset.piece;
+                    const originalSourcePiece = square.dataset.piece;
+
+                    target.dataset.piece = square.dataset.piece;
+                    square.dataset.piece = "0";
+
+                    removeAllAttackMarks();
+                    forEachSquare((sq) => {
+                        if (sq.dataset.piece[0] === enemySideCode) {
+                            markEnemyAttackingSquares(sq, parseInt(sq.dataset.row), parseInt(sq.dataset.col), enemySideCode);
+                        }
+                    });
+
+                    if (kingSquare.dataset.attacked === "0") {
+                        blockingMoves.push({
+                            from: { row, col },
+                            to: { row: parseInt(target.dataset.row), col: parseInt(target.dataset.col) }
+                        });
+                    }
+
+                    // Undo simulated move
+                    square.dataset.piece = originalSourcePiece;
+                    target.dataset.piece = originalPiece;
+                    removeAllAttackMarks();
+                    forEachSquare((sq) => {
+                        if (sq.dataset.piece[0] === enemySideCode) {
+                            markEnemyAttackingSquares(sq, parseInt(sq.dataset.row), parseInt(sq.dataset.col), enemySideCode);
+                        }
+                    });
+                }
+            });
+        }
+    });
+
+    // After scanning all squares
+    blockingPossible = blockingMoves.length > 0;
+
+    if (!blockingPossible) {
+        checkMated = true;
+        console.log("Checkmate!");
+    } else {
+        console.log("Check but not checkmate.");
+    }
+
+}
+
+function removeAllAttackMarks() {
+    forEachSquare((square) => {
+        square.dataset.attacked = 0;
+    });
+}
+
 export function receivedMove(data) {
     removeCircles();
     removeHighlights();
@@ -243,6 +440,10 @@ export function receivedMove(data) {
     })
     const startSquare = getSquare(data.startPos.y, data.startPos.x);
     const finalSquare = getSquare(data.finalPos.y, data.finalPos.x);
+
+    if (finalSquare.dataset.piece !== "0") {
+        finalSquare.innerHTML = "";
+    }
 
     const img = document.createElement("img");
     img.src = "chess/pieces/" + data.piece + ".svg";
@@ -261,9 +462,13 @@ export function receivedMove(data) {
 
     startSquare.style.backgroundColor = colors[startSquare.classList.contains("white") ? "white" : "green"].yellow;
     finalSquare.style.backgroundColor = colors[finalSquare.classList.contains("white") ? "white" : "green"].yellow;
+
+
+    markWhatEnemyCanAttack(data.piece[0]);
 }
 
 export function startGame(playerSide) {
+    gameWindow.appendChild(board);
     board.innerHTML = "";
     const playerSideCode = playerSide[0];
 
@@ -281,6 +486,7 @@ export function startGame(playerSide) {
             square.dataset.piece = 0;
             square.dataset.moveable = 0;
             square.dataset.highlighted = 0;
+            square.dataset.attacked = 0;
             board.appendChild(square);
         }
     }
@@ -302,6 +508,7 @@ export function startGame(playerSide) {
         square.addEventListener("mousedown", (e) => {
             if (e.button == 2) return;
             const isWhite = square.classList.contains("white");
+            removeCircles();
             if (!selectedSquare && square.dataset.piece !== "0" && square.dataset.piece[0] === playerSideCode) {
                 recolorBoard();
                 selectedSquare = square;
@@ -325,6 +532,8 @@ export function startGame(playerSide) {
                 removeHighlights();
                 selectedSquare.dataset.highlighted = 1;
                 square.dataset.highlighted = 1;
+
+                blockingMoves = [];
 
                 selectedSquare.dataset.piece = 0;
                 selectedSquare.innerHTML = "";
@@ -372,6 +581,8 @@ export function startGame(playerSide) {
                 selectedSquare.dataset.highlighted = 1;
                 square.dataset.highlighted = 1;
 
+                blockingMoves = [];
+
 
                 selectedSquare.dataset.piece = 0;
                 selectedSquare.innerHTML = "";
@@ -397,6 +608,7 @@ export function startGame(playerSide) {
             const isWhite = square.classList.contains("white");
             square.style.backgroundColor = colors[isWhite ? "white" : "green"].red;
             
+            console.log(square.dataset.attacked)
         })
     })
     

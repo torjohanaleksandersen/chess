@@ -43,7 +43,6 @@ class GameRoom {
     }
 
     switchTurn() {
-        console.log("changing turn")
         this.players[this.turn].socket.emit("end-turn");
 
         
@@ -117,7 +116,6 @@ setInterval(() => {
 io.on('connection', socket => {
     const user = new User(socket);
     networkManager.users.push(user);
-    console.log(user.socket.id)
     socket.on('disconnect', () => {
         networkManager.users = networkManager.users.filter(element => element !== user);
     });    
