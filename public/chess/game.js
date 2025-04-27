@@ -98,6 +98,8 @@ let selectedSquare = null;
 let handPiece = null;
 let myTurn = false;
 let kingChecked = false;
+let playerSideCode = "";
+let gameEnded = false;
 
 let blockingMoves = [];
 
@@ -133,7 +135,7 @@ function moveHandPiece(e) {
     const rect = handPiece.getBoundingClientRect();
 
     handPiece.style.left = (x - rect.width / 2) + "px";
-    handPiece.style.top = (y - rect.height * 1.75 ) + "px";
+    handPiece.style.top = (y - rect.height * 1.5 ) + "px";
 }
 
 function removeHandPiece() {
@@ -235,14 +237,14 @@ function markEnemyAttackingSquares(square, row, col, playerSideCode) {
 
     if (data.recursive) {
         for (const [dx, dy] of data.directions) {
-            let foundEnemy = false;
+            let foundEnemy = false, foundAlly;
             for (let i = 1; i < 8; i++) {
                 const x = col + i * dx;
                 const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
+                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy || foundAlly) break;
 
                 const square = getSquare(y, x);
-                if (square.dataset.piece[0] === playerSideCode) break;
+                if (square.dataset.piece[0] === playerSideCode) foundAlly = true;
                 if (square.dataset.piece[0] === enemySideCode) foundEnemy = true;
 
                 square.dataset.attacked = 1;
@@ -256,7 +258,7 @@ function markEnemyAttackingSquares(square, row, col, playerSideCode) {
             if (x < 0 || x > 7 || y < 0 || y > 7) continue;
 
             const square = getSquare(y, x);
-            if (square.dataset.piece[0] === playerSideCode) continue;
+            //if (square.dataset.piece[0] === playerSideCode) continue;
 
             if (pieceName != "P" && square.dataset.piece[0] != enemySideCode) {
                 square.dataset.attacked = 1;
@@ -315,7 +317,7 @@ function removeHighlights() {
     })
 }
 
-export function markWhatEnemyCanAttack(enemySideCode) {
+export function calculateEnemyAttacks(enemySideCode) {
     const playerSideCode = enemySideCode === "w" ? "b" : "w";
     
     // First, reset all attacked squares
@@ -341,7 +343,6 @@ export function markWhatEnemyCanAttack(enemySideCode) {
             kingSquare = square;
             if (square.dataset.attacked === "1") {
                 checked = true;
-                console.log("checked!")
                 
                 movableSquares.K.directions.forEach(([dx, dy]) => {
                     const newRow = parseInt(square.dataset.row) + dy;
@@ -367,6 +368,7 @@ export function markWhatEnemyCanAttack(enemySideCode) {
 
     // If king can move, it's not checkmate
     if (kingCanMove) {
+        console.log("king can move")
         checkMated = false;
     }
 
@@ -420,6 +422,7 @@ export function markWhatEnemyCanAttack(enemySideCode) {
     if (!blockingPossible) {
         checkMated = true;
         console.log("Checkmate!");
+        endGame(false);
     } else {
         console.log("Check but not checkmate.");
     }
@@ -433,11 +436,8 @@ function removeAllAttackMarks() {
 }
 
 export function receivedMove(data) {
-    removeCircles();
     removeHighlights();
-    forEachSquare((square) => {
-        square.dataset.moveable = 0;
-    })
+
     const startSquare = getSquare(data.startPos.y, data.startPos.x);
     const finalSquare = getSquare(data.finalPos.y, data.finalPos.x);
 
@@ -464,13 +464,16 @@ export function receivedMove(data) {
     finalSquare.style.backgroundColor = colors[finalSquare.classList.contains("white") ? "white" : "green"].yellow;
 
 
-    markWhatEnemyCanAttack(data.piece[0]);
+    calculateEnemyAttacks(data.piece[0]);
 }
 
 export function startGame(playerSide) {
     gameWindow.appendChild(board);
     board.innerHTML = "";
-    const playerSideCode = playerSide[0];
+    playerSideCode = playerSide[0];
+
+    document.querySelector(".game").style.display = "flex";
+    document.querySelector(".home").style.display = "none";
 
     const rowOrder = playerSide === "white" ? [...Array(8).keys()] : [...Array(8).keys()].reverse();
     const colOrder = playerSide === "white" ? [...Array(8).keys()] : [...Array(8).keys()].reverse();
@@ -607,8 +610,6 @@ export function startGame(playerSide) {
             if (square.dataset.highlighted === "1") return;
             const isWhite = square.classList.contains("white");
             square.style.backgroundColor = colors[isWhite ? "white" : "green"].red;
-            
-            console.log(square.dataset.attacked)
         })
     })
     
@@ -618,4 +619,24 @@ export function startGame(playerSide) {
 
 export function switchTurn(turn) {
     myTurn = turn;
+}
+
+
+export function endGame(playerWon) {
+    gameEnded = true;
+    socket.emit("player-lost");
+
+    forEachSquare((square) => {
+        const isKingSquare = square.dataset.piece === playerSideCode + "K";
+        const isWhite = square.classList.contains("white");
+
+        const newSquare = square.cloneNode(true);
+
+        if (isKingSquare) {
+            newSquare.style.backgroundColor = colors[isWhite ? "white" : "green"].red;
+            console.log("redded");
+        }
+
+        square.parentNode.replaceChild(newSquare, square);
+    });
 }
