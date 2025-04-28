@@ -155,10 +155,138 @@ function getSquare(row, col) {
     return document.querySelector(`.square[data-row="${row}"][data-col="${col}"]`);
 }
 
+function markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode) {
+    const blockingSquares = [];
+
+    // Find direction from pinned piece toward the king
+    const stepX = Math.sign(kx);
+    const stepY = Math.sign(ky);
+
+    // Step toward the king
+    let x = col;
+    let y = row;
+    while (x !== kingSquare.col || y !== kingSquare.row) {
+        if (x !== col || y !== row) blockingSquares.push({ row: y, col: x });
+        x += stepX;
+        y += stepY;
+    }
+
+    // Step toward the attacker (the enemy piece that pinned us)
+    // We already know the attack direction: `dx`, `dy`
+    x = col;
+    y = row;
+    while (true) {
+        x += dx;
+        y += dy;
+        if (x < 0 || x > 7 || y < 0 || y > 7) break;
+
+        const square = getSquare(y, x);
+        if (square.dataset.piece[0] === playerSideCode) break; // blocked by friendly piece
+        blockingSquares.push({ row: y, col: x });
+
+        if (square.dataset.piece === enemySideCode + "B" || square.dataset.piece === enemySideCode + "R" || square.dataset.piece === enemySideCode + "Q") {
+            // reached the attacker
+            break;
+        }
+    }
+
+    // Now blockingSquares contains all squares allowed for the pinned piece
+    blockingMoves = blockingSquares.map(square => ({
+        from: { row, col },
+        to: { row: square.row, col: square.col }
+    }));
+}
+
+function pinnedPiece(row, col) {
+    let kingSquare = {row: 0, col: 0};
+    forEachSquare((square, row, col) => {
+        if (square.dataset.piece === (playerSideCode + "K")) {
+            kingSquare = {row, col};
+        }
+    })
+
+    const kx = kingSquare.col - col;
+    const ky = kingSquare.row - row;
+
+    const enemySideCode = playerSideCode === "w" ? "b" : "w";
+
+    if (Math.abs(kx) === Math.abs(ky)) {
+        //diagonal pin
+        for (const [dx, dy] of movableSquares.B.directions) {
+            let foundEnemy = false;
+            for (let i = 1; i < 8; i++) {
+                const x = col + i * dx;
+                const y = row + i * dy;
+                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
+
+                const square = getSquare(y, x);
+
+                if (square.dataset.piece[0] === playerSideCode) break;
+                if (square.dataset.piece[0] === enemySideCode) {
+                    if (square.dataset.piece === enemySideCode + "B" || square.dataset.piece === enemySideCode + "Q") {
+                        
+                        markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode);
+                        
+                        return true;
+                    }
+                    foundEnemy = true
+                };
+            }
+        }
+    } else if ((Math.abs(ky) === 0 && Math.abs(kx) > 0)) {
+        for (const [dx, dy] of [[1, 0],[-1, 0]]) {
+            let foundEnemy = false;
+            for (let i = 1; i < 8; i++) {
+                const x = col + i * dx;
+                const y = row + i * dy;
+                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
+
+                const square = getSquare(y, x);
+
+                if (square.dataset.piece[0] === playerSideCode) break;
+                if (square.dataset.piece[0] === enemySideCode) {
+                    if (square.dataset.piece === enemySideCode + "R" || square.dataset.piece === enemySideCode + "Q") {
+                        
+                        markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode);
+                        
+                        return true;
+                    }
+                    foundEnemy = true
+                };
+            }
+        }
+    } else if ((Math.abs(kx) === 0 && Math.abs(ky) > 0)) {
+        for (const [dx, dy] of [[0, 1],[0, -1]]) {
+            let foundEnemy = false;
+            for (let i = 1; i < 8; i++) {
+                const x = col + i * dx;
+                const y = row + i * dy;
+                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
+
+                const square = getSquare(y, x);
+
+                if (square.dataset.piece[0] === playerSideCode) break;
+                if (square.dataset.piece[0] === enemySideCode) {
+                    if (square.dataset.piece === enemySideCode + "R" || square.dataset.piece === enemySideCode + "Q") {
+                        
+                        markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode);
+                        
+                        return true;
+                    }
+                    foundEnemy = true
+                };
+            }
+        }
+    }
+    return false;
+}
+
 function markMovableSquares(selectedSquare, row, col, playerSideCode, simulation = false) {
     const enemySideCode = playerSideCode === "w" ? "b" : "w";
     const pieceName = selectedSquare.dataset.piece[1];
     const data = movableSquares[pieceName];
+
+    const piecePinned = pinnedPiece(row, col);
 
     if (blockingMoves.length > 0 && simulation === false) {
         forEachSquare((square) => {
@@ -176,6 +304,8 @@ function markMovableSquares(selectedSquare, row, col, playerSideCode, simulation
 
         return;
     }
+
+    if (piecePinned) return;
 
 
     if (data.recursive) {
@@ -196,14 +326,21 @@ function markMovableSquares(selectedSquare, row, col, playerSideCode, simulation
             }
         }
     } else {
+        let allyInFront = false;
         for (const [dx, dy] of data.directions) {
+            if (allyInFront) continue;
             const inverted = playerSideCode === "w" ? 1 : -1;
             const x = col + (dx) * inverted;
             const y = row + (dy) * inverted;
             if (x < 0 || x > 7 || y < 0 || y > 7) continue;
 
             const square = getSquare(y, x);
-            if (square.dataset.piece[0] === playerSideCode) continue;
+
+            if (square.dataset.piece[0] === playerSideCode) {
+                allyInFront = true;
+                continue;
+            }
+            if (pieceName === "K" && square.dataset.attacked === "1") continue;
 
             if (pieceName != "P" || square.dataset.piece[0] != enemySideCode) {
                 markWithCircle(square);
@@ -493,6 +630,8 @@ export function startGame(playerSide) {
             board.appendChild(square);
         }
     }
+
+    calculateEnemyAttacks(playerSideCode === "w" ? "b" : "w");
     
     forEachSquare((square, row, col) => {
         const key = `${row},${col}`;
