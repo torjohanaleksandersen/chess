@@ -1,65 +1,30 @@
 import { socket } from "../networking.js";
-const board = document.createElement("div");
-board.classList.add("board");
+const boardDiv = document.createElement("div");
+boardDiv.classList.add("board");
 const gameWindow = document.querySelector(".game-window");
 
-const initialPositions = {
-    '0,0': 'bR', '0,1': 'bN', '0,2': 'bB', '0,3': 'bQ',
-    '0,4': 'bK', '0,5': 'bB', '0,6': 'bN', '0,7': 'bR',
-    '1,0': 'bP', '1,1': 'bP', '1,2': 'bP', '1,3': 'bP',
-    '1,4': 'bP', '1,5': 'bP', '1,6': 'bP', '1,7': 'bP',
-    '6,0': 'wP', '6,1': 'wP', '6,2': 'wP', '6,3': 'wP',
-    '6,4': 'wP', '6,5': 'wP', '6,6': 'wP', '6,7': 'wP',
-    '7,0': 'wR', '7,1': 'wN', '7,2': 'wB', '7,3': 'wQ',
-    '7,4': 'wK', '7,5': 'wB', '7,6': 'wN', '7,7': 'wR'
-}
+const board = [
+    [0b11101, 0b11010, 0b11100, 0b11110, 0b11011, 0b11100, 0b11010, 0b11101],
+    [0b11001, 0b11001, 0b11001, 0b11001, 0b11001, 0b11001, 0b11001, 0b11001],
+    [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000],
+    [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000],
+    [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000],
+    [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000],
+    [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001],
+    [0b10101, 0b10010, 0b10100, 0b10110, 0b10011, 0b10100, 0b10010, 0b10101],
+]
 
-const movableSquares = {
-    R: {
-        recursive: true,
-        directions: [
-            [1, 0],
-            [-1, 0],
-            [0, 1],
-            [0, -1]
-        ]
-    },
-    B: {
-        recursive: true,
-        directions: [
-            [1, 1],
-            [-1, 1],
-            [1, -1],
-            [-1, -1]
-        ]
-    },
-    Q: {
-        recursive: true,
-        directions: [
-            [1, 1],
-            [-1, 1],
-            [1, -1],
-            [-1, -1],
-            [1, 0],
-            [-1, 0],
-            [0, 1],
-            [0, -1]
-        ]
-    },
-    K: {
+const pieces = {
+    P: {
+        code: 0b001,
         recursive: false,
         directions: [
-            [1, 1],
-            [-1, 1],
-            [1, -1],
-            [-1, -1],
-            [1, 0],
-            [-1, 0],
-            [0, 1],
-            [0, -1]
+            [0, -1],
+            [0, -2],
         ]
     },
     N: {
+        code: 0b010,
         recursive: false,
         directions: [
             [2, 1],
@@ -72,13 +37,54 @@ const movableSquares = {
             [-2, -1]
         ]
     },
-    P: {
+    K: {
+        code: 0b011,
         recursive: false,
         directions: [
-            [0, -1],
-            [0, -2],
+            [1, 1],
+            [-1, 1],
+            [1, -1],
+            [-1, -1],
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1]
         ]
-    }
+    },
+    B: {
+        code: 0b100,
+        recursive: true,
+        directions: [
+            [1, 1],
+            [-1, 1],
+            [1, -1],
+            [-1, -1]
+        ]
+    },
+    R: {
+        code: 0b101,
+        recursive: true,
+        directions: [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1]
+        ]
+    },
+    Q: {
+        code: 0b110,
+        recursive: true,
+        directions: [
+            [1, 1],
+            [-1, 1],
+            [1, -1],
+            [-1, -1],
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1]
+        ]
+    },
 }
 
 const colors = {
@@ -94,688 +100,606 @@ const colors = {
     },
 }
 
-let selectedSquare = null;
-let handPiece = null;
-let myTurn = false;
-let kingChecked = false;
-let playerSideCode = "";
-let gameEnded = false;
+class Square {
+    constructor (code, div) {
+        this.code = code;
+        this.div = div;
+        this.color = null;
+        this.attacked = false;
+        this.attackedFrom = null;
+        this.row = parseInt(div.dataset.row);
+        this.col = parseInt(div.dataset.col);
 
-let blockingMoves = [];
-
-
-function forEachSquare(callback) {
-    document.querySelectorAll(".square").forEach(square => {
-        const row = parseInt(square.dataset.row);
-        const col = parseInt(square.dataset.col);
-        callback(square, row, col);
-    })
-}
-
-function addHandPiece(piece) {
-    const img = document.createElement("img");
-    img.classList.add("piece-in-hand");
-    img.draggable = false;
-    img.src = "chess/pieces/" + piece + ".svg";
-    const rect = board.getBoundingClientRect();
-    img.style.height = rect.height * 0.125 + "px";
-    img.style.width = rect.height * 0.125 + "px";
-
-    handPiece = img;
-
-    board.appendChild(img);
-}
-
-function moveHandPiece(e) {
-    if (!handPiece) return;
-
-    const x = e.screenX;
-    const y = e.screenY;
-
-    const rect = handPiece.getBoundingClientRect();
-
-    handPiece.style.left = (x - rect.width / 2) + "px";
-    handPiece.style.top = (y - rect.height * 1.5 ) + "px";
-}
-
-function removeHandPiece() {
-    if (!handPiece) return;
-    board.removeChild(handPiece);
-}
-
-function recolorBoard() {
-    forEachSquare((square, row, col) => {
-        if (square.dataset.highlighted === "1") return;
-        const isWhite = (row + col) % 2 === 0;
-        square.style.backgroundColor = colors[isWhite ? "white" : "green"].normal;
-    })
-}
-
-function getSquare(row, col) {
-    return document.querySelector(`.square[data-row="${row}"][data-col="${col}"]`);
-}
-
-function markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode) {
-    const blockingSquares = [];
-
-    // Find direction from pinned piece toward the king
-    const stepX = Math.sign(kx);
-    const stepY = Math.sign(ky);
-
-    // Step toward the king
-    let x = col;
-    let y = row;
-    while (x !== kingSquare.col || y !== kingSquare.row) {
-        if (x !== col || y !== row) blockingSquares.push({ row: y, col: x });
-        x += stepX;
-        y += stepY;
+        
+        document.querySelector(".game").style.display = "flex";
+        document.querySelector(".home").style.display = "none";
     }
 
-    // Step toward the attacker (the enemy piece that pinned us)
-    // We already know the attack direction: `dx`, `dy`
-    x = col;
-    y = row;
-    while (true) {
-        x += dx;
-        y += dy;
-        if (x < 0 || x > 7 || y < 0 || y > 7) break;
-
-        const square = getSquare(y, x);
-        if (square.dataset.piece[0] === playerSideCode) break; // blocked by friendly piece
-        blockingSquares.push({ row: y, col: x });
-
-        if (square.dataset.piece === enemySideCode + "B" || square.dataset.piece === enemySideCode + "R" || square.dataset.piece === enemySideCode + "Q") {
-            // reached the attacker
-            break;
+    getPieceFromCode() {
+        let key = "";
+        for (const k in pieces) {
+            if (pieces[k].code === (this.code & 0b00111)) {
+                key = k;
+            }
         }
+
+        return key;
     }
 
-    // Now blockingSquares contains all squares allowed for the pinned piece
-    blockingMoves = blockingSquares.map(square => ({
-        from: { row, col },
-        to: { row: square.row, col: square.col }
-    }));
-}
-
-function pinnedPiece(row, col) {
-    let kingSquare = {row: 0, col: 0};
-    forEachSquare((square, row, col) => {
-        if (square.dataset.piece === (playerSideCode + "K")) {
-            kingSquare = {row, col};
-        }
-    })
-
-    const kx = kingSquare.col - col;
-    const ky = kingSquare.row - row;
-
-    const enemySideCode = playerSideCode === "w" ? "b" : "w";
-
-    if (Math.abs(kx) === Math.abs(ky)) {
-        //diagonal pin
-        for (const [dx, dy] of movableSquares.B.directions) {
-            let foundEnemy = false;
-            for (let i = 1; i < 8; i++) {
-                const x = col + i * dx;
-                const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
-
-                const square = getSquare(y, x);
-
-                if (square.dataset.piece[0] === playerSideCode) break;
-                if (square.dataset.piece[0] === enemySideCode) {
-                    if (square.dataset.piece === enemySideCode + "B" || square.dataset.piece === enemySideCode + "Q") {
-                        
-                        markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode);
-                        
-                        return true;
-                    }
-                    foundEnemy = true
-                };
-            }
-        }
-    } else if ((Math.abs(ky) === 0 && Math.abs(kx) > 0)) {
-        for (const [dx, dy] of [[1, 0],[-1, 0]]) {
-            let foundEnemy = false;
-            for (let i = 1; i < 8; i++) {
-                const x = col + i * dx;
-                const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
-
-                const square = getSquare(y, x);
-
-                if (square.dataset.piece[0] === playerSideCode) break;
-                if (square.dataset.piece[0] === enemySideCode) {
-                    if (square.dataset.piece === enemySideCode + "R" || square.dataset.piece === enemySideCode + "Q") {
-                        
-                        markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode);
-                        
-                        return true;
-                    }
-                    foundEnemy = true
-                };
-            }
-        }
-    } else if ((Math.abs(kx) === 0 && Math.abs(ky) > 0)) {
-        for (const [dx, dy] of [[0, 1],[0, -1]]) {
-            let foundEnemy = false;
-            for (let i = 1; i < 8; i++) {
-                const x = col + i * dx;
-                const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
-
-                const square = getSquare(y, x);
-
-                if (square.dataset.piece[0] === playerSideCode) break;
-                if (square.dataset.piece[0] === enemySideCode) {
-                    if (square.dataset.piece === enemySideCode + "R" || square.dataset.piece === enemySideCode + "Q") {
-                        
-                        markBlockingMovesWhileInPin(kx, ky, dx, dy, row, col, kingSquare, enemySideCode);
-                        
-                        return true;
-                    }
-                    foundEnemy = true
-                };
-            }
-        }
-    }
-    return false;
-}
-
-function markMovableSquares(selectedSquare, row, col, playerSideCode, simulation = false) {
-    const enemySideCode = playerSideCode === "w" ? "b" : "w";
-    const pieceName = selectedSquare.dataset.piece[1];
-    const data = movableSquares[pieceName];
-
-    const piecePinned = pinnedPiece(row, col);
-
-    if (blockingMoves.length > 0 && simulation === false) {
-        forEachSquare((square) => {
-            square.dataset.moveable = 0;
-        });
-        removeCircles();
-        blockingMoves.forEach(move => {
-            if (move.from.row == row && move.from.col == col) {
-                const square = getSquare(move.to.row, move.to.col);
-
-                markWithCircle(square);
-                square.dataset.moveable = 1;
-            }
-        })
-
-        return;
+    getCodeFromPiece(piece) {
+        return pieces[piece.toUpperCase()].code || 0b000;
     }
 
-    if (piecePinned) return;
-
-
-    if (data.recursive) {
-        for (const [dx, dy] of data.directions) {
-            let foundEnemy = false;
-            for (let i = 1; i < 8; i++) {
-                const x = col + i * dx;
-                const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy) break;
-
-                const square = getSquare(y, x);
-
-                if (square.dataset.piece[0] === playerSideCode) break;
-                if (square.dataset.piece[0] === enemySideCode) foundEnemy = true;
-
-                markWithCircle(square);
-                square.dataset.moveable = 1;
-            }
-        }
-    } else {
-        let allyInFront = false;
-        for (const [dx, dy] of data.directions) {
-            if (allyInFront) continue;
-            const inverted = playerSideCode === "w" ? 1 : -1;
-            const x = col + (dx) * inverted;
-            const y = row + (dy) * inverted;
-            if (x < 0 || x > 7 || y < 0 || y > 7) continue;
-
-            const square = getSquare(y, x);
-
-            if (square.dataset.piece[0] === playerSideCode) {
-                allyInFront = true;
-                continue;
-            }
-            if (pieceName === "K" && square.dataset.attacked === "1") continue;
-
-            if (pieceName != "P" || square.dataset.piece[0] != enemySideCode) {
-                markWithCircle(square);
-                square.dataset.moveable = 1;
-            }
-
-            const pawnRow = playerSideCode === "w" ? 6 : 1;
-
-            if (pieceName == "P" && !(row === pawnRow && (y == 4 || y == 3))) {
-                const topLeftSquare = getSquare(y, x - 1)
-                if (topLeftSquare && topLeftSquare.dataset.piece[0] === enemySideCode) {
-                    markWithCircle(topLeftSquare);
-                    topLeftSquare.dataset.moveable = 1;
-                }
-                const topRightSquare = getSquare(y, x + 1)
-                if (topRightSquare && topRightSquare.dataset.piece[0] === enemySideCode) {
-                    markWithCircle(topRightSquare);
-                    topRightSquare.dataset.moveable = 1;
-                }
-            }
-
-            if (pieceName == "P" && (row != pawnRow || square.dataset.piece !== "0")) return;
-        }
-    }
-}
-
-function markEnemyAttackingSquares(square, row, col, playerSideCode) {
-    const enemySideCode = playerSideCode === "w" ? "b" : "w";
-    const pieceName = square.dataset.piece[1];
-    const data = movableSquares[pieceName];
-
-    if (data.recursive) {
-        for (const [dx, dy] of data.directions) {
-            let foundEnemy = false, foundAlly;
-            for (let i = 1; i < 8; i++) {
-                const x = col + i * dx;
-                const y = row + i * dy;
-                if (x < 0 || x > 7 || y < 0 || y > 7 || foundEnemy || foundAlly) break;
-
-                const square = getSquare(y, x);
-                if (square.dataset.piece[0] === playerSideCode) foundAlly = true;
-                if (square.dataset.piece[0] === enemySideCode) foundEnemy = true;
-
-                square.dataset.attacked = 1;
-            }
-        }
-    } else {
-        for (const [dx, dy] of data.directions) {
-            const inverted = playerSideCode === "w" ? 1 : -1;
-            const x = col + (dx) * inverted;
-            const y = row + (dy) * inverted;
-            if (x < 0 || x > 7 || y < 0 || y > 7) continue;
-
-            const square = getSquare(y, x);
-            //if (square.dataset.piece[0] === playerSideCode) continue;
-
-            if (pieceName != "P" && square.dataset.piece[0] != enemySideCode) {
-                square.dataset.attacked = 1;
-            }
-
-            const pawnRow = playerSideCode === "w" ? 6 : 1;
-
-            if (pieceName == "P" && row != pawnRow) {
-                const topLeftSquare = getSquare(y, x - 1)
-                if (topLeftSquare && topLeftSquare.dataset.piece[0] === enemySideCode) {
-                    topLeftSquare.dataset.attacked = 1;
-                }
-                const topRightSquare = getSquare(y, x + 1)
-                if (topRightSquare && topRightSquare.dataset.piece[0] === enemySideCode) {
-                    topRightSquare.dataset.attacked = 1;;
-                }
-            }
-            if (pieceName == "P" && row != pawnRow) return;
-        }
-    }
-}
-
-function markWithCircle(square) {
-    if (square.querySelector(".circle")) return;
-    const circle = document.createElement("div");
-    circle.classList.add("circle");
-    square.appendChild(circle);
-}
-
-function removeCircles() {
-    forEachSquare((square) => {
-        const circles = square.querySelectorAll(".circle");
-        if (circles.length > 0) {
-            for (const circle of circles) {
-                square.removeChild(circle);
-            }
-        }
-    })
-}
-
-function madeMove(piece, startPos, finalPos, playerSideCode) {
-    let r0x = parseInt(startPos.x);
-    let r0y = parseInt(startPos.y);
-    let rx = parseInt(finalPos.x);
-    let ry = parseInt(finalPos.y);
-
-    socket.emit("move", {piece, 
-        startPos: {x: r0x, y: r0y}, 
-        finalPos: {x: rx, y: ry},
-    })
-}
-
-function removeHighlights() {
-    forEachSquare((square) => {
-        square.dataset.highlighted = 0;
-    })
-}
-
-export function calculateEnemyAttacks(enemySideCode) {
-    const playerSideCode = enemySideCode === "w" ? "b" : "w";
+    decode() {
+        const empty = ((this.code & (1 << 4)) > 0) ? 0 : 1;
+        const enemy = ((this.code & (1 << 3)) > 0) ? 1 : 0;
+        const pieceCode = this.code & 0b111;
+        
     
-    // First, reset all attacked squares
-    forEachSquare((square) => {
-        square.dataset.attacked = 0;
-    });
+        return { empty, enemy, pieceCode };
+    }
+    
+}
 
-    // Mark squares attacked by enemy
-    forEachSquare((square, row, col) => {
-        if (square.dataset.piece[0] === enemySideCode) {
-            markEnemyAttackingSquares(square, row, col, enemySideCode);
+export class Game {
+    constructor (team) {
+        this.team = team
+        this.myTurn = this.team === "white" ? true : false;
+        this.selectedSquare = null;
+        this.handPieceDiv = null;
+        this.ended = false;
+        
+        this.board = [];
+        this.history = [];
+        this.legalMoves = [];
+        this.currentLegalMoves = [];
+
+        this.start();
+    }
+
+    //initializing
+
+    start() {
+        gameWindow.appendChild(boardDiv);
+        this.initializeBoard();
+        this.initializeEventListeners();
+    }
+
+    initializeBoard() {
+        boardDiv.innerHTML = "";
+
+        let __board = board;
+        if (this.team == "black") {
+            __board = this.reverseBoard(board);
         }
-    });
-
-    let checked = false;
-    let checkMated = false;
-    let kingCanMove = false;
-    let kingSquare = null;
-
-    // Find if player king is in check and if it can move
-    forEachSquare((square, row, col) => {
-        if (square.dataset.piece === (playerSideCode + "K")) {
-            kingSquare = square;
-            if (square.dataset.attacked === "1") {
-                checked = true;
+        
+        for (let y = 0; y < 8; y++) {
+            this.board[y] = []; 
+            for (let x = 0; x < 8; x++) {
+                const squareDiv = document.createElement("div");
+                squareDiv.classList.add("square");
+                const isWhite = (y + x) % 2 === 0;
+                squareDiv.classList.add(isWhite ? "white" : "green");
+                squareDiv.dataset.row = y;
+                squareDiv.dataset.col = x;
+    
+                const square = new Square(__board[y][x], squareDiv);
+                square.color = isWhite ? "white" : "green";
+                this.board[y][x] = square;
                 
-                movableSquares.K.directions.forEach(([dx, dy]) => {
-                    const newRow = parseInt(square.dataset.row) + dy;
-                    const newCol = parseInt(square.dataset.col) + dx;
-                    const target = getSquare(newRow, newCol);
-                    
-                    if (target && target.dataset.piece[0] !== playerSideCode && target.dataset.attacked === "0") {
-                        kingCanMove = true;
-                        blockingMoves.push({
-                            from: {row: parseInt(square.dataset.row), col: parseInt(square.dataset.col)},
-                            to: {row: newRow, col: newCol}
-                        })
-                    }
-                });
+                boardDiv.appendChild(squareDiv);
             }
         }
-    });
-
-    if (!checked) {
-        kingChecked = false;
-        return;
-    }
-
-    // If king can move, it's not checkmate
-    if (kingCanMove) {
-        console.log("king can move")
-        checkMated = false;
-    }
-
-    // Else, check if other pieces can block or capture
-    let blockingPossible = false;
-
-    forEachSquare((square, row, col) => {
-        if (square.dataset.piece[0] === playerSideCode && square.dataset.piece[1] !== "K") {
-            markMovableSquares(square, row, col, playerSideCode, true);
-            removeCircles();
-            forEachSquare((target) => {
-                if (target.dataset.moveable === "1") {
-                    // Simulate move
-                    const originalPiece = target.dataset.piece;
-                    const originalSourcePiece = square.dataset.piece;
-
-                    target.dataset.piece = square.dataset.piece;
-                    square.dataset.piece = "0";
-
-                    removeAllAttackMarks();
-                    forEachSquare((sq) => {
-                        if (sq.dataset.piece[0] === enemySideCode) {
-                            markEnemyAttackingSquares(sq, parseInt(sq.dataset.row), parseInt(sq.dataset.col), enemySideCode);
-                        }
-                    });
-
-                    if (kingSquare.dataset.attacked === "0") {
-                        blockingMoves.push({
-                            from: { row, col },
-                            to: { row: parseInt(target.dataset.row), col: parseInt(target.dataset.col) }
-                        });
-                    }
-
-                    // Undo simulated move
-                    square.dataset.piece = originalSourcePiece;
-                    target.dataset.piece = originalPiece;
-                    removeAllAttackMarks();
-                    forEachSquare((sq) => {
-                        if (sq.dataset.piece[0] === enemySideCode) {
-                            markEnemyAttackingSquares(sq, parseInt(sq.dataset.row), parseInt(sq.dataset.col), enemySideCode);
-                        }
-                    });
-                }
-            });
-        }
-    });
-
-    // After scanning all squares
-    blockingPossible = blockingMoves.length > 0;
-
-    if (!blockingPossible) {
-        checkMated = true;
-        console.log("Checkmate!");
-        endGame(false);
-    } else {
-        console.log("Check but not checkmate.");
-    }
-
-}
-
-function removeAllAttackMarks() {
-    forEachSquare((square) => {
-        square.dataset.attacked = 0;
-    });
-}
-
-export function receivedMove(data) {
-    removeHighlights();
-
-    const startSquare = getSquare(data.startPos.y, data.startPos.x);
-    const finalSquare = getSquare(data.finalPos.y, data.finalPos.x);
-
-    if (finalSquare.dataset.piece !== "0") {
-        finalSquare.innerHTML = "";
-    }
-
-    const img = document.createElement("img");
-    img.src = "chess/pieces/" + data.piece + ".svg";
-    img.style.height = "96%";
-    img.style.width = "96%";
-    img.draggable = false;
-    startSquare.innerHTML = "";
-    startSquare.dataset.piece = "0";
-    finalSquare.dataset.piece = data.piece;
-    finalSquare.appendChild(img);
-
-    recolorBoard();
-
-    startSquare.dataset.highlighted = 1;
-    finalSquare.dataset.highlighted = 1;
-
-    startSquare.style.backgroundColor = colors[startSquare.classList.contains("white") ? "white" : "green"].yellow;
-    finalSquare.style.backgroundColor = colors[finalSquare.classList.contains("white") ? "white" : "green"].yellow;
-
-
-    calculateEnemyAttacks(data.piece[0]);
-}
-
-export function startGame(playerSide) {
-    gameWindow.appendChild(board);
-    board.innerHTML = "";
-    playerSideCode = playerSide[0];
-
-    document.querySelector(".game").style.display = "flex";
-    document.querySelector(".home").style.display = "none";
-
-    const rowOrder = playerSide === "white" ? [...Array(8).keys()] : [...Array(8).keys()].reverse();
-    const colOrder = playerSide === "white" ? [...Array(8).keys()] : [...Array(8).keys()].reverse();
-
-    for (let row of rowOrder) {
-        for (let col of colOrder) {
-            const square = document.createElement("div");
-            square.classList.add("square");
-            const isWhite = (row + col) % 2 === 0;
-            square.classList.add(isWhite ? "white" : "green");
-            square.dataset.row = row;
-            square.dataset.col = col;
-            square.dataset.piece = 0;
-            square.dataset.moveable = 0;
-            square.dataset.highlighted = 0;
-            square.dataset.attacked = 0;
-            board.appendChild(square);
-        }
-    }
-
-    calculateEnemyAttacks(playerSideCode === "w" ? "b" : "w");
     
-    forEachSquare((square, row, col) => {
-        const key = `${row},${col}`;
-        if (initialPositions[key]) {
+        this.drawPieces();
+
+
+    }
+    
+    reverseBoard(board) {
+        const q1 = board[0][3];
+        const q2 = board[7][3];
+
+        board[0][3] = board[0][4];
+        board[0][4] = q1;
+
+        board[7][3] = board[7][4];
+        board[7][4] = q2;
+
+        return board;
+    }
+
+    //main methods
+    drawPieces() {
+        this.removeHandPiece()
+        this.forEachSquare((square) => {
+            const decodedSquare = square.decode(); // Pass team to decode method
+            if (decodedSquare.empty) return;
+    
+            const exisitingImage = square.div.querySelector("img");
+            if (exisitingImage) square.div.removeChild(exisitingImage);
+    
             const img = document.createElement("img");
-            img.src = "chess/pieces/" + initialPositions[key] + ".svg";
+            const piece = square.getPieceFromCode();
+    
+            // Determine the side (whether it is white or black based on the current team)
+            const side = (decodedSquare.enemy && this.team === "white") || (!decodedSquare.enemy && this.team === "black") ? "b" : "w";
+    
+            img.src = `chess/pieces/${side + piece}.svg`;
             img.style.height = "96%";
             img.style.width = "96%";
             img.draggable = false;
-            square.dataset.piece = initialPositions[key];
-            square.appendChild(img);
+    
+            square.div.appendChild(img);
+        });
+    }
+
+    initializeEventListeners() {
+        this.forEachSquare((square) => {
+            
+            square.div.addEventListener("mousedown", (e) => {
+                if (e.button == 2 || this.ended) return;
+
+                this.recolorBoard()
+
+                if (!this.selectedSquare && this.myPiece(square)) {
+                    this.selectPiece(square);
+                } else if (this.selectedSquare && !this.myPiece(square) && this.myTurn) {
+                    this.movePiece(square);
+                } else if (this.selectedSquare && this.myTurn) {
+                    this.selectPiece(square);
+                } else if (this.selectedSquare) {
+                    this.selectedSquare = null;
+                    this.drawPieces();
+                    this.recolorBoard();
+                    this.removeCircles();
+                }
+            })
+
+            square.div.addEventListener("mouseup", (e) => {
+                if (e.button == 2 || !this.selectedSquare || this.ended) return;
+
+                if (this.selectedSquare != square && !this.myPiece(square) && this.myTurn) {
+                    this.movePiece(square);
+                } else if (this.selectedSquare != square && this.myPiece(square) && this.myTurn) {
+                    this.drawPieces();
+                } else if (this.selectedSquare == square) {
+                    this.drawPieces();
+                } else if (this.selectedSquare) {
+                    this.selectedSquare = null;
+                    this.drawPieces();
+                    this.recolorBoard();
+                    this.removeCircles();
+                }
+            })
+
+            square.div.addEventListener("contextmenu", (e) => {
+                if (this.ended) return;
+
+                e.preventDefault();
+                square.div.style.backgroundColor = colors[square.color].red;
+
+                console.log(square.attackedFrom, square.getPieceFromCode())
+            })
+
+        })
+
+        boardDiv.addEventListener("mousemove", (e) => {
+            this.moveHandPiece(e);
+        })
+
+        boardDiv.addEventListener("mouseover", (e) => {
+            this.moveHandPiece(e);
+        })
+    }
+
+    selectPiece(square) {
+        if (square.decode().enemy) return;
+
+        this.removeCircles();
+        this.recolorBoard();
+
+        this.legalMoves = [];
+        this.currentLegalMoves = [];
+        this.selectedSquare = square;
+        this.selectedSquare.div.style.backgroundColor = colors[this.selectedSquare.color].yellow;
+        this.selectedSquare.div.querySelector("img").style.display = "none";
+        const teamChar = this.team[0];
+
+        this.addHandPiece(teamChar + this.selectedSquare.getPieceFromCode());
+
+        this.findLegalMoves();
+
+        const moves = this.getLegalMoveFromSquare(this.selectedSquare);
+
+        moves.forEach(({row, col}) => {
+            this.addCircle(this.getSquare(row, col));
+            this.currentLegalMoves.push({row, col});
+        })
+    }
+
+    movePiece(square) {
+        let legal = false;
+        for (const {row, col} of this.currentLegalMoves) {
+            if (square.row === row && square.col === col) {
+                legal = true;
+            };
         }
-    })
-    
-    forEachSquare((square, row, col) => {
-        square.addEventListener("mousedown", (e) => {
-            if (e.button == 2) return;
-            const isWhite = square.classList.contains("white");
-            removeCircles();
-            if (!selectedSquare && square.dataset.piece !== "0" && square.dataset.piece[0] === playerSideCode) {
-                recolorBoard();
-                selectedSquare = square;
-                selectedSquare.style.backgroundColor = colors[isWhite ? "white" : "green"].yellow;
-                const img = selectedSquare.querySelector("img");
-                img.style.display = "none";
-                markMovableSquares(selectedSquare, row, col, playerSideCode);
-                addHandPiece(selectedSquare.dataset.piece);
-            } else if (selectedSquare && square.dataset.moveable === "1" && myTurn) {
-                const img = document.createElement("img");
-                img.src = "chess/pieces/" + selectedSquare.dataset.piece + ".svg";
-                img.style.height = "96%";
-                img.style.width = "96%";
-                img.draggable = false;
-                square.innerHTML = "";
-                square.dataset.piece = selectedSquare.dataset.piece;
-                square.appendChild(img);
-                square.style.backgroundColor = colors[isWhite ? "white" : "green"].yellow;
-                
-                madeMove(square.dataset.piece, {x: selectedSquare.dataset.col, y: selectedSquare.dataset.row}, {x: square.dataset.col, y: square.dataset.row}, playerSideCode);
-                removeHighlights();
-                selectedSquare.dataset.highlighted = 1;
-                square.dataset.highlighted = 1;
-
-                blockingMoves = [];
-
-                selectedSquare.dataset.piece = 0;
-                selectedSquare.innerHTML = "";
-    
-                selectedSquare = null;
-                forEachSquare((square) => {
-                    square.dataset.moveable = 0;
-                })
-                removeCircles();
-                recolorBoard();
-            } else if (selectedSquare && square.dataset.piece[0] !== playerSideCode) {
-                addHandPiece(selectedSquare.dataset.piece);
-                const img = selectedSquare.querySelector("img");
-                img.style.display = "none";
-            } else if (selectedSquare && square.dataset.piece[0] === playerSideCode) {
-                removeCircles();
-                recolorBoard();
-                selectedSquare = square;
-                selectedSquare.style.backgroundColor = colors[isWhite ? "white" : "green"].yellow;
-                const img = selectedSquare.querySelector("img");
-                img.style.display = "none";
-                markMovableSquares(selectedSquare, row, col, playerSideCode);
-                addHandPiece(selectedSquare.dataset.piece);
-            } else {
-                recolorBoard();
-            }
-        })
-    
-        square.addEventListener("mouseup", (e) => {
-            if (e.button == 2) return;
-            const isWhite = square.classList.contains("white");
-            if (selectedSquare !== square && selectedSquare && square.dataset.moveable === "1" && myTurn) {
-                const img = document.createElement("img");
-                img.src = "chess/pieces/" + selectedSquare.dataset.piece + ".svg";
-                img.style.height = "96%";
-                img.style.width = "96%";
-                img.draggable = false;
-                square.innerHTML = "";
-                square.dataset.piece = selectedSquare.dataset.piece;
-                square.appendChild(img);
-                square.style.backgroundColor = colors[isWhite ? "white" : "green"].yellow;
-    
-                madeMove(square.dataset.piece, {x: selectedSquare.dataset.col, y: selectedSquare.dataset.row}, {x: square.dataset.col, y: square.dataset.row}, playerSideCode);
-                removeHighlights();
-                selectedSquare.dataset.highlighted = 1;
-                square.dataset.highlighted = 1;
-
-                blockingMoves = [];
-
-
-                selectedSquare.dataset.piece = 0;
-                selectedSquare.innerHTML = "";
-    
-                selectedSquare = null;
-                forEachSquare((square) => {
-                    square.dataset.moveable = 0;
-                })
-                removeCircles();
-                removeHandPiece();
-    
-                recolorBoard();
-            } else if (selectedSquare) {
-                const img = selectedSquare.querySelector("img");
-                img.style.display = "block";
-                removeHandPiece();
-            }
-        })
-    
-        square.addEventListener("contextmenu", (e) => {
-            e.preventDefault();
-            if (square.dataset.highlighted === "1") return;
-            const isWhite = square.classList.contains("white");
-            square.style.backgroundColor = colors[isWhite ? "white" : "green"].red;
-        })
-    })
-    
-    board.addEventListener("mousemove", (e) => {moveHandPiece(e)})
-    board.addEventListener("mouseover", (e) => {moveHandPiece(e)})
-}
-
-export function switchTurn(turn) {
-    myTurn = turn;
-}
-
-
-export function endGame(playerWon) {
-    gameEnded = true;
-    socket.emit("player-lost");
-
-    forEachSquare((square) => {
-        const isKingSquare = square.dataset.piece === playerSideCode + "K";
-        const isWhite = square.classList.contains("white");
-
-        const newSquare = square.cloneNode(true);
-
-        if (isKingSquare) {
-            newSquare.style.backgroundColor = colors[isWhite ? "white" : "green"].red;
-            console.log("redded");
+        if (!legal) {
+            this.selectedSquare = null;
+            this.drawPieces();
+            this.recolorBoard();
+            this.removeCircles();
+            return;
         }
 
-        square.parentNode.replaceChild(newSquare, square);
-    });
+        this.removeHandPiece();
+        this.removeCircles();
+        this.sendMove(square, this.selectedSquare);
+
+        square.code = this.selectedSquare.code;
+        square.div.style.backgroundColor = colors[square.color].yellow;
+
+        this.selectedSquare.code = 0b00000;
+        this.selectedSquare.div.innerHTML = "";
+        this.selectedSquare = null;
+
+        this.drawPieces();
+    }
+
+    findLegalMoves() {
+        this.legalMoves = [];
+    
+        this.forEachSquare((sq) => {
+            if (!this.myPiece(sq)) return;
+    
+            const pieceName = sq.getPieceFromCode();
+            const piece = pieces[pieceName];
+    
+            // Special handling for pawns
+            if (pieceName === "P") {
+                const forward = -1;  // Assume your pawns move up (row - 1). Adjust if needed.
+                const startRow = 6;  // Replace with 1 if your pawns start at row 1
+    
+                // Forward move
+                const oneStep = this.getSquare(sq.row + forward, sq.col);
+                if (oneStep && oneStep.decode().empty) {
+                    this.legalMoves.push({
+                        from: { col: sq.col, row: sq.row },
+                        to: { col: oneStep.col, row: oneStep.row }
+                    });
+    
+                    // Two-step move from starting row
+                    if (sq.row === startRow) {
+                        const twoStep = this.getSquare(sq.row + 2 * forward, sq.col);
+                        if (twoStep && twoStep.decode().empty) {
+                            this.legalMoves.push({
+                                from: { col: sq.col, row: sq.row },
+                                to: { col: twoStep.col, row: twoStep.row }
+                            });
+                        }
+                    }
+                }
+    
+                // Diagonal captures
+                for (const dx of [-1, 1]) {
+                    const target = this.getSquare(sq.row + forward, sq.col + dx);
+                    if (target && !target.decode().empty && target.decode().enemy === 1) {
+                        this.legalMoves.push({
+                            from: { col: sq.col, row: sq.row },
+                            to: { col: target.col, row: target.row }
+                        });
+                    }
+                }
+    
+                return; // Skip normal directional logic for pawns
+            }
+    
+            // Other pieces
+            for (const [dx, dy] of piece.directions) {
+                let steps = piece.recursive ? 8 : 1;
+    
+                for (let i = 1; i <= steps; i++) {
+                    const x = sq.col + dx * i;
+                    const y = sq.row + dy * i;
+    
+                    if (!this.isInBounds(x, y)) break;
+    
+                    const target = this.getSquare(y, x);
+                    const isMy = this.myPiece(target);
+                    const isEnemy = this.enemyPiece(target);
+    
+                    if (isMy) break;
+    
+                    this.legalMoves.push({
+                        from: { col: sq.col, row: sq.row },
+                        to: { col: x, row: y }
+                    });
+    
+                    if (isEnemy) break; // Stop after capturing
+                }
+            }
+        });
+    
+        // Filter out illegal moves that leave king in check
+        const filteredMoves = [];
+    
+        this.legalMoves.forEach(move => {
+            const { from, to } = move;
+    
+            const fromSq = this.getSquare(from.row, from.col);
+            const toSq = this.getSquare(to.row, to.col);
+    
+            const fromSqSaved = fromSq.code;
+            const toSqSaved = toSq.code;
+    
+            toSq.code = fromSq.code;         // Simulate move
+            fromSq.code = 0b00000;       // Clear from square
+
+            this.forEachSquare(sq => {
+                sq.attacked = false;
+                sq.attackedFrom = null;
+            });
+
+            this.findEnemyAttacks()
+    
+            if (!this.kingChecked()) {
+                filteredMoves.push(move);
+            }
+    
+            // Revert state
+            fromSq.code = fromSqSaved;
+            toSq.code = toSqSaved;
+
+            
+        });
+    
+        this.legalMoves = filteredMoves;
+
+        this.checkIfCheckMated();
+    }
+
+    findEnemyAttacks() {
+        this.forEachSquare((sq) => {
+            if (!this.enemyPiece(sq)) return;
+    
+            const pieceName = sq.getPieceFromCode();
+            const piece = pieces[pieceName];
+    
+            if (pieceName === "P") {
+                for (const dx of [-1, 1]) {
+                    const x = sq.col + dx;
+                    const y = sq.row + 1;
+    
+                    if (!this.isInBounds(x, y)) continue;
+    
+                    const target = this.getSquare(y, x);
+                    target.attacked = true;
+                    target.attackedFrom = sq.div;
+                }
+                return; // Skip generic piece logic
+            }
+    
+            // All other pieces
+            for (const [dx, dy] of piece.directions) {
+                let steps = piece.recursive ? 8 : 1;
+    
+                for (let i = 1; i <= steps; i++) {
+                    const x = sq.col + dx * i;
+                    const y = sq.row + dy * i;
+    
+                    if (!this.isInBounds(x, y)) break;
+    
+                    const target = this.getSquare(y, x);
+    
+                    const isAlly = this.enemyPiece(target);  // From enemy’s perspective, this is their own piece
+                    const isEnemy = this.myPiece(target)
+
+                    if (isAlly) break;
+                    
+                    target.attacked = true;
+                    target.attackedFrom = sq.div;
+
+                    if (isEnemy) break;
+                }
+            }
+        });
+    }
+
+    kingChecked() {
+        if (this.getKingsSquare().attacked) return true;
+        return false;
+    }
+
+    getLegalMoveFromSquare(square) {
+        return this.legalMoves
+            .filter(move => move.from.col === square.col && move.from.row === square.row)
+            .map(move => ({ row: move.to.row, col: move.to.col }));
+    }
+
+    //networking
+
+    sendMove(startSquare, endSquare) {
+        let startPos = 0b000000;
+        let endPos = 0b000000;
+
+        startPos |= (startSquare.row << 3) | (startSquare.col);
+        endPos |= (endSquare.row << 3) | (endSquare.col);
+
+        const dataMsg = 0b000000000000 | ((startPos << 6) | endPos);
+
+        socket.emit("move", dataMsg);
+    }
+
+    receivedMove(msgData) {
+        this.recolorBoard();
+        // Extract start and end positions
+        const startPos = (msgData >> 6) & 0b111111;  // Extract start position (bits 6-11)
+        const endPos = msgData & 0b111111;           // Extract end position (bits 0-5)
+    
+        // Extract row and column for the start square (startPos)
+        const toRow = 7 - ((startPos >> 3) & 0b111); // Reverse the row and mask out the last 3 bits for row
+        const toCol = 7 - (startPos & 0b111);            // Mask out the last 3 bits for column
+    
+        // Extract row and column for the end square (endPos)
+        const fromRow = 7 - ((endPos >> 3) & 0b111);     // Reverse the row and mask out the last 3 bits for row
+        const fromCol = 7 - (endPos & 0b111);                // Mask out the last 3 bits for column
+    
+        // Get the square objects
+        const fromSq = this.getSquare(fromRow, fromCol);
+        const toSq = this.getSquare(toRow, toCol);
+    
+        // Copy the piece from the source to the target square
+        toSq.code = fromSq.code;              // Simulate the move (copy the piece)
+        fromSq.code = 0b00000;                // Clear the from square (empty it)
+
+        fromSq.div.innerHTML = "";
+
+        fromSq.div.style.backgroundColor = colors[fromSq.color].yellow
+        toSq.div.style.backgroundColor = colors[toSq.color].yellow
+    
+        // Recolor the board and redraw the pieces
+        this.drawPieces();
+
+        this.findLegalMoves();
+    }
+
+    endGame(lost, data) {
+        if (lost) {
+            this.ended = true;
+            socket.emit("game-ended", data);
+
+            const kingSq = this.getKingsSquare();
+            kingSq.div.style.backgroundColor = colors[kingSq.color].red;
+            return;
+        }
+
+        this.forEachSquare(sq => {
+            if (sq.getPieceFromCode() === "K" && this.enemyPiece(sq)) {
+                sq.div.style.backgroundColor = colors[sq.color].red;
+            }
+        })
+
+        console.log("youve won!")
+    }
+
+    //small methods
+
+    getKingsSquare() {
+        let kingsSquare = null;
+        this.forEachSquare(sq => {
+            if (sq.getPieceFromCode() === "K" && this.myPiece(sq)) {
+                kingsSquare = sq;
+            }
+        })
+        return kingsSquare;
+    }
+
+    checkIfCheckMated() {
+        if (this.legalMoves.length === 0) {
+            this.endGame(true, 0b01);
+        }
+    }
+
+    resign() {
+        this.endGame(true, 0b10);
+    }
+
+    addHandPiece(pieceName) {
+        const img = document.createElement("img");
+        img.classList.add("piece-in-hand");
+        img.draggable = false;
+        img.src = "chess/pieces/" + pieceName + ".svg";
+        const rect = boardDiv.getBoundingClientRect();
+        img.style.height = rect.height * 0.125 + "px";
+        img.style.width = rect.height * 0.125 + "px";
+
+        this.handPieceDiv = img;
+
+        boardDiv.appendChild(img);
+    }
+
+    moveHandPiece(e) {
+        if (! this.handPieceDiv) return;
+        this.handPieceDiv.style.top = e.clientY - 50 + "px";
+        this.handPieceDiv.style.left = e.clientX - 50 + "px";
+    }
+
+    removeHandPiece() {
+        // Check if handPieceDiv is valid and exists in the DOM
+        if (this.handPieceDiv) {
+            // Ensure the handPieceDiv is a child of boardDiv before removing it
+            if (boardDiv.contains(this.handPieceDiv)) {
+                boardDiv.removeChild(this.handPieceDiv);
+                this.handPieceDiv = null; // Optionally reset the reference to prevent further issues
+            }
+        }
+    }
+
+    switchTurn() {
+        if (this.myTurn) {
+            this.myTurn = false;
+        } else {
+            this.myTurn = true;
+        }
+    }
+
+    addCircle(square) {
+        const div = document.createElement("div");
+        div.classList.add("circle");
+
+        square.div.appendChild(div);
+    }
+
+    removeCircles() {
+        this.forEachSquare(square => {
+            const circles = square.div.querySelectorAll(".circle");
+            if (circles.length > 0) {
+                for (const circle of circles) {
+                    square.div.removeChild(circle);
+                }
+            }
+        })
+    }
+
+    recolorBoard() {
+        this.forEachSquare((square) => {
+            square.div.style.backgroundColor = colors[square.color].normal;
+        })
+    }
+
+    myPiece(square) {
+        const decodedSquare = square.decode();
+        if (decodedSquare.empty) return false;
+        return decodedSquare.enemy === 1 ? false : true;
+    }
+    
+    enemyPiece(square) {
+        const decodedSquare = square.decode();
+        if (decodedSquare.empty) return false;
+        return decodedSquare.enemy === 1 ? true : false;
+    }
+
+    isInBounds(x, y) {
+        return x >= 0 && x < 8 && y >= 0 && y < 8;
+    }
+
+    forEachSquare(callback) {
+        this.board.forEach((row, y) => {
+            row.forEach((square, x) => {
+                callback(square, y, x);
+            })
+        })
+    }
+
+    getSquare(row, col) {
+        let square = null;
+        this.forEachSquare(sq => {
+            if (sq.row == row && sq.col == col) {
+                square = sq;
+            }
+        })
+        return square;
+    }
 }
+

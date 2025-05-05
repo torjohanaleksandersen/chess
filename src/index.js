@@ -14,6 +14,7 @@ class User {
         this.socket = socket;
         this.searching = false;
         this.inQueue = false;
+        this.queueTime = 0;
         this.currentGame = {};
 
         this.socket.on("find-game-request", () => {
@@ -28,6 +29,12 @@ class User {
                 this.currentGame.room.switchTurn();
             }
         });
+
+        this.socket.on("game-ended", data => {
+            if (this.currentGame?.room) {
+                this.currentGame.room.end(this.socket.id, data);
+            }
+        })
         
     }
 }
@@ -43,13 +50,19 @@ class GameRoom {
     }
 
     switchTurn() {
-        this.players[this.turn].socket.emit("end-turn");
+        this.players.white.socket.emit("switch-turn");
+        this.players.black.socket.emit("switch-turn");
 
-        
-        if (this.turn === "white") this.turn = "black";
-        else this.turn = "white";
+        this.turn = this.turn === "white" ? "black" : "white";
+    }
 
-        this.players[this.turn].socket.emit("your-turn");
+    end(socketId, data) {
+        for (const key in this.players) {
+            const player = this.players[key]
+            if (player.socket.id !== socketId) {
+                player.socket.emit("you-win", data);
+            }
+        }
     }
 }
 
@@ -60,13 +73,25 @@ class NetworkManager {
         this.queue = [];
     }
 
-    update() {
+    update(dt) {
         this.users.forEach(user => {
             if (user.searching && !user.inQueue && !user.currentGame?.enemy) {
                 this.queue.push(user);
                 user.inQueue = true;
+                user.queueTime = 60000;
             }
         })
+
+        let filteredQueue = [];
+        this.queue.forEach(user => {
+            user.queueTime -= dt;
+
+            if (user.queueTime > 0) {
+                filteredQueue.push(user);
+            }
+        })
+
+        this.queue = filteredQueue;
 
         if (this.queue.length >= 2) {
             const gameRoom = new GameRoom();
@@ -108,9 +133,10 @@ class NetworkManager {
 
 const networkManager = new NetworkManager();
 
+const dt = 100;
 setInterval(() => {
-    networkManager.update();
-}, 100)
+    networkManager.update(dt);
+}, dt)
 
 
 io.on('connection', socket => {
@@ -118,6 +144,7 @@ io.on('connection', socket => {
     networkManager.users.push(user);
     socket.on('disconnect', () => {
         networkManager.users = networkManager.users.filter(element => element !== user);
+        networkManager.queue = networkManager.queue.filter(element => element !== user);
     });    
 })
 
