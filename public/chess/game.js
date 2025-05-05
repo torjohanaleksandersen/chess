@@ -565,8 +565,8 @@ export class Game {
     }
 
     endGame(lost, data) {
+        this.ended = true;
         if (lost) {
-            this.ended = true;
             socket.emit("game-ended", data);
 
             const kingSq = this.getKingsSquare();
