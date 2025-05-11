@@ -1,7 +1,8 @@
+import { homeScreenController } from "../index.js";
 import { socket } from "../networking.js";
 const boardDiv = document.createElement("div");
 boardDiv.classList.add("board");
-const gameWindow = document.querySelector(".game-window");
+const gameWindow = document.querySelector(".game-board-container");
 
 const board = [
     [0b11101, 0b11010, 0b11100, 0b11110, 0b11011, 0b11100, 0b11010, 0b11101],
@@ -89,12 +90,22 @@ const pieces = {
 
 const colors = {
     green: {
+        /*
         normal: "rgb(115,149,82)",
         yellow: "rgb(185,202,67)",
         red: "rgb(211,108,80)",
+        */
+        normal: "#C89768",
+        yellow: "#E1C35A",
+        red: "rgb(211,108,80)",
     },
     white: {
+        /*
         normal: "rgb(235,236,208)",
+        yellow: "rgb(245,246,130)",
+        red: "rgb(235,125,106)",
+        */
+        normal: "#E2D4BB",
         yellow: "rgb(245,246,130)",
         red: "rgb(235,125,106)",
     },
@@ -148,6 +159,9 @@ export class Game {
         this.selectedSquare = null;
         this.handPieceDiv = null;
         this.ended = false;
+        this.kingMoved = false;
+        this.queensRookMoved = false;
+        this.kingsRookMoved = false;
         
         this.board = [];
         this.history = [];
@@ -163,6 +177,8 @@ export class Game {
         gameWindow.appendChild(boardDiv);
         this.initializeBoard();
         this.initializeEventListeners();
+
+        homeScreenController.newGame();
     }
 
     initializeBoard() {
@@ -278,8 +294,6 @@ export class Game {
 
                 e.preventDefault();
                 square.div.style.backgroundColor = colors[square.color].red;
-
-                console.log(square.attackedFrom, square.getPieceFromCode())
             })
 
         })
@@ -337,6 +351,10 @@ export class Game {
         this.removeCircles();
         this.sendMove(square, this.selectedSquare);
 
+        this.updateCastlingLogic(this.selectedSquare);
+
+        this.handleCastlingOnMove(square);
+
         square.code = this.selectedSquare.code;
         square.div.style.backgroundColor = colors[square.color].yellow;
 
@@ -393,6 +411,10 @@ export class Game {
                 }
     
                 return; // Skip normal directional logic for pawns
+            }
+
+            if (pieceName === "K") {
+                this.handleCastlingOnSelect()
             }
     
             // Other pieces
@@ -517,6 +539,101 @@ export class Game {
             .map(move => ({ row: move.to.row, col: move.to.col }));
     }
 
+    updateCastlingLogic(sq) {
+        const name = sq.getPieceFromCode()
+        if (name !== "R" && name !== "K") return;
+
+        if (name === "K") {
+            this.kingMoved = true;
+            return;
+        }
+
+        const kingsCol = this.team === "white" ? 7 : 0;
+        const queensCol = this.team === "white" ? 0 : 7;
+
+        if (sq.col === kingsCol) {
+            this.kingsRookMoved = true;
+        } else if (sq.col === queensCol) {
+            this.queensRookMoved = true;
+        }
+    }
+
+    handleCastlingOnSelect() {
+        if (this.kingMoved) return;
+
+        const kingsSq = this.getKingsSquare();
+
+        let kingsSideEmpty = true, queensSideEmpty = true;
+        for (let i = kingsSq.col + 1; i < 8 - 1; i ++) {
+            const square = this.getSquare(7, i);
+            if (square.decode().empty === 0) {
+                kingsSideEmpty = false;
+                break;
+            };
+        }
+        if (kingsSideEmpty) {
+            this.legalMoves.push({
+                from: {
+                    row: kingsSq.row,
+                    col: kingsSq.col
+                },
+                to: {
+                    row: kingsSq.row,
+                    col: 6
+                }
+            })
+        }
+
+        for (let i = kingsSq.col - 1; i > 1; i --) {
+            const square = this.getSquare(7, i);
+            if (square.decode().empty === 0) {
+                queensSideEmpty = false;
+                break;
+            };
+        }
+        if (queensSideEmpty) {
+            this.legalMoves.push({
+                from: {
+                    row: kingsSq.row,
+                    col: kingsSq.col
+                },
+                to: {
+                    row: kingsSq.row,
+                    col: 2
+                }
+            })
+        }
+    }
+
+    handleCastlingOnMove(square) {
+        if (this.selectedSquare === this.getKingsSquare() && (square.row === 7 && square.col === 6)) {
+
+            const kingsRookSaved = this.board[7][7].code;
+            this.board[7][7].code = 0b00000;
+            this.board[7][7].div.innerHTML = "";
+            this.board[7][5].code = kingsRookSaved;
+        } else if (this.selectedSquare === this.getKingsSquare() && (square.row === 7 && square.col === 2)) {
+
+            const queensRookSaved = this.board[7][0].code;
+            this.board[7][0].code = 0b00000;
+            this.board[7][0].div.innerHTML = "";
+            this.board[7][3].code = queensRookSaved;
+        }
+    }
+
+    handleCastlingOnReceivingMove(startSq, endSq) {
+        if (startSq.getPieceFromCode() !== "K") return;
+
+        const startCol = this.team === "white" ? 4 : 3;
+
+        /*
+        if (startSq === this.getSquare(0, startCol) && endSq === this.getSquare(0, endCol)) {
+
+        } else if (endCol === this.getSquare(0, ))
+        */
+    }
+    
+
     //networking
 
     sendMove(startSquare, endSquare) {
@@ -526,13 +643,14 @@ export class Game {
         startPos |= (startSquare.row << 3) | (startSquare.col);
         endPos |= (endSquare.row << 3) | (endSquare.col);
 
-        const dataMsg = 0b000000000000 | ((startPos << 6) | endPos);
+        let dataMsg = 0b000000000000 | ((startPos << 6) | endPos);
 
         socket.emit("move", dataMsg);
     }
 
     receivedMove(msgData) {
         this.recolorBoard();
+
         // Extract start and end positions
         const startPos = (msgData >> 6) & 0b111111;  // Extract start position (bits 6-11)
         const endPos = msgData & 0b111111;           // Extract end position (bits 0-5)
@@ -548,6 +666,8 @@ export class Game {
         // Get the square objects
         const fromSq = this.getSquare(fromRow, fromCol);
         const toSq = this.getSquare(toRow, toCol);
+
+        this.handleCastlingOnReceivingMove(fromSq, toSq);
     
         // Copy the piece from the source to the target square
         toSq.code = fromSq.code;              // Simulate the move (copy the piece)

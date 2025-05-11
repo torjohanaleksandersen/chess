@@ -4,7 +4,7 @@
     display: grid;
     grid-template-columns: repeat(8, 12.5%);
     grid-template-rows: repeat(8, 12.5%);
-    border: 1px solid gray;
+    border: 1px solid #6A5546;
 }
 
 .square {
@@ -22,6 +22,7 @@
     top: 0;
     left: 0;
     z-index: 0;
+    cursor: grab;
 }
 
 .square .circle {
@@ -37,11 +38,11 @@
 }
 
 .white {
-    background-color: rgb(235,236,208);
+    background-color: #E2D4BB;
 }
 
 .green {
-    background-color: rgb(115,149,82);
+    background-color: #C89768;
 }
 
 .piece-in-hand {
