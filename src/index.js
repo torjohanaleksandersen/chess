@@ -8,104 +8,8 @@ const io = new Server(httpServer);
 
 const PORT = process.env.PORT || 5000;
 
-class UserRegister {
-    constructor () {
-        this.users = [];
-    }
-
-    registerNewAccount(user = {}) {
-        if (Object.keys(user).length === 0) return false;
-
-        let successful = true;
-        this.users.forEach(element => {
-            if (element.username === user.username && element.password === user.password) successful = false;
-        })
-        if (!successful) return false;
-
-        this.users.push(user);
-
-        return true;
-    }
-
-    setDataToUser(user, data) {
-        const _user = this.getUser(user);
-        if (!_user) return;
-        _user.avatar = data.avatar;
-        _user.gamertag = data.gamertag
-        _user.ELO = data.ELO;
-    }
-
-    getUser(user) {
-        let foundUser = null;
-        this.users.forEach(element => {
-            if (element.username === user.username && element.password === user.password) {
-                foundUser = element;
-            }
-        })
-        return foundUser || false;
-    }
-}
-
-const userRegister = new UserRegister();
-
-class User {
-    constructor(socket) {
-        this.socket = socket;
-        this.searching = false;
-        this.inQueue = false;
-        this.queueTime = 0;
-        this.avatar = {};
-        this.currentGame = {};
-        this.username = "";
-        this.password = "";
-        this.gamertag = "";
-        this.ELO = 0;
-
-        this.socket.on("find-game-request", () => {
-            this.searching = true;
-        })
-
-        this.socket.on("move", data => {
-            if (this.currentGame?.enemy?.socket) {
-                this.currentGame.enemy.socket.emit("move-received", data); // keep bit 12 intact
-            }
-        
-            if (this.currentGame?.room) {
-                this.currentGame.room.switchTurn();
-            }
-        });        
-
-        this.socket.on("game-ended", data => {
-            if (this.currentGame?.room) {
-                this.currentGame.room.end(this.socket.id, data);
-            }
-        })
-        
-        this.socket.on("create-account", data => {
-            const user = {username: data[0], password: data[1]};
-            const successful = userRegister.registerNewAccount(user);
-            socket.emit("account-created", successful);
-
-            if (successful) {
-                this.username = data[0];
-                this.password = data[1];
-            }
-        })
-
-        this.socket.on("request-login", data => {
-            const user = {username: data[0], password: data[1]};
-            const successful = userRegister.getUser(user);
-            this.socket.emit("user-login-successful", successful);
-        })
-
-        this.socket.on("set-user-information", data => {
-            this.avatar = data.avatar;
-            this.gamertag = data.gamertag;
-            this.ELO = data.ELO;
-            userRegister.setDataToUser({username: this.username, password: this.password}, data);
-        })
-    }
-}
+import { Database } from "./database.js";
+import { User } from "./user.js";
 
 class GameRoom {
     constructor () {
@@ -200,6 +104,7 @@ class NetworkManager {
 }
 
 const networkManager = new NetworkManager();
+export const database = new Database();
 
 const dt = 100;
 setInterval(() => {

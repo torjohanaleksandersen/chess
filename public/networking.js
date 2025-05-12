@@ -1,12 +1,15 @@
 import { Game } from "./chess/game.js";
-import { homeScreenController, user } from "./index.js";
+import { gameScreenController, homeScreenController, user } from "./index.js";
 
 export const socket = io();
 export let game = null;
 
-socket.on("match-found", ({ color, roomId }) => {
+socket.on("match-found", ({ color, data }) => {
     user.inGame = true;
     game = new Game(color);
+
+    gameScreenController.teamColor = color;
+    gameScreenController.initializeGame(data);
 });
 
 socket.on("move-received", msgData => {
@@ -17,17 +20,17 @@ socket.on("switch-turn", () => {game.switchTurn()});
 
 socket.on("you-win", data => {game.endGame(false, data)});
 
-socket.on("account-created", successful => {
-    if (successful) {
-        homeScreenController.confirmAccount();
+socket.on("register-account-result", result => {
+    if (result.success) {
+        homeScreenController.confirmAccount(result.username);
         return;
     }
     homeScreenController.deniedAccount();
 })
 
-socket.on("user-login-successful", userData => {
-    if (userData) {
-        homeScreenController.loginSuccessful(userData);
+socket.on("user-login-result", result => {
+    if (result.success) {
+        homeScreenController.loginSuccessful(result.user);
         return;
     }
     homeScreenController.loginNotSuccessful();

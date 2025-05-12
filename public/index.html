@@ -16,7 +16,7 @@
     <main>
         <div class="sidebar">
             <header>
-                <svg id="home" width="120" viewBox="0 0 369.89473684210526 151.21163880454716">
+                <svg id="home" width="8vw" viewBox="0 0 369.89473684210526 151.21163880454716">
                     <g transform="matrix(1.565798743854996,0,0,1.565798743854996,-29.891246165439583,0.11205255622979848)" fill="#eeeeee">
                         <path fill="#eeeeee" d="M80.399,30.668c-4.688-5.256-13.123-10.827-14.692-15.138c-0.854-1.543-5.217-1.908-7.57-3.116  c0.227-3.042,1.258-5.275,1.779-8.015c-4.726,0.022-8.057,1.44-10.685,3.562C36.025,8.728,28.289,20.066,26.968,32.449  c-1.435,13.465,4.812,22.266,3.562,35.483c1.423,0.755,3.094,1.373,4.918,1.89l-0.003,0.002l-4.05,9.34h4.58  c-0.029,0.134-0.044,0.276-0.044,0.421v1.772c0,0.262,0.054,0.505,0.142,0.736H34.72c-1.149,0-2.079,0.934-2.079,2.082v1.068h-5.563  c-1.147,0-2.078,0.93-2.078,2.078l-2.078,7.101c0,1.147,0.931,2.078,2.078,2.078h46.065c1.15,0,2.081-0.931,2.081-2.078  l-1.733-7.101c0-1.148-0.932-2.078-2.078-2.078h-3.79v-1.068c0-1.148-0.93-2.082-2.077-2.082h-1.351  c0.088-0.231,0.139-0.475,0.139-0.736v-1.772c0-0.145-0.016-0.287-0.044-0.421h1.741c2.756,0.017,2.882-2.241,3.533-6.643  c1.188-17.813-7.802-25.44-16.029-33.838c5.062,1.355,6.84-2.187,11.577-1.779c3.682,0.315,5.509,4.547,8.459,4.896  c3.353,0.396,6.935-1.591,8.904-4.007C82.366,35.375,82.014,32.218,80.399,30.668z"></path>
                     </g>
@@ -39,7 +39,7 @@
                         <img src="img/account.png" alt="no-account" style="cursor: pointer;" id="log-in-sign-up">
                     </div>
                     <div class="gamertag">
-                        <p><span>no account</span> <span style="font-weight: 600; margin-left: auto;">400</span></p>
+                        <p><span id="account-gamertag">no account</span> <span id="account-ELO" style="font-weight: 600; margin-left: auto;">400</span></p>
                     </div>
                     <img src="img/settings.png" alt="settings" style="margin-left: auto;">
                 </div>
@@ -48,40 +48,36 @@
     
         <div class="game">
             <div class="game-window">
-                <div class="player">
-                    <img src="img/account.png" alt="player-pfpic" height="75px" width="75px">
+                <div class="player" id="pl-2">
+                    <div class="profile-picture">
+                        <img src="img/account.png" alt="player-pfpic" height="95%" style="aspect-ratio: 1 / 1;">
+                    </div>
                     <div class="player-data">
-                        <p style="display: flex; justify-content: space-between; width: 250px;">
-                            guest_120398120 
-                            <span style="font-weight: 600;">547</span>
+                        <p style="display: flex; justify-content: space-between; width: 20vw;">
+                            <span class="game-gamertag">guest_120398120 </span>
+                            <span class="game-ELO" style="font-weight: 600;">547</span>
                         </p>                          
                         <div class="taken-pieces">
-                            <p style="font-weight: 600; color: gray;">+13</p>
-                            <div style="width: 10px;"></div>
-                            <img src="chess/pieces/wB.svg">
-                            <img src="chess/pieces/wN.svg">
-                            <img src="chess/pieces/wQ.svg">
-                            <img src="chess/pieces/wB.svg">
+                            <p class="material-number" style="font-weight: 600; color: gray;"></p>
+                            <div style="width: 1vw;"></div>
                         </div>
                     </div>
                 </div>
                 <div class="game-board-container">
 
                 </div>
-                <div class="player">
-                    <img src="img/account.png" alt="player-pfpic" height="75px" width="75px">
+                <div class="player" id="pl-1">
+                    <div class="profile-picture">
+                        <img src="img/account.png" alt="player-pfpic" height="95%" style="aspect-ratio: 1 / 1;">
+                    </div>
                     <div class="player-data">
-                        <p style="display: flex; justify-content: space-between; width: 250px;">
-                            guest_120398120 
-                            <span style="font-weight: 600;">547</span>
+                        <p style="display: flex; justify-content: space-between; width: 20vw;">
+                            <span class="game-gamertag">guest_120398120 </span>
+                            <span class="game-ELO" style="font-weight: 600;">547</span>
                         </p>                          
                         <div class="taken-pieces">
-                            <p style="font-weight: 600; color: gray;">+13</p>
-                            <div style="width: 10px;"></div>
-                            <img src="chess/pieces/wB.svg">
-                            <img src="chess/pieces/wN.svg">
-                            <img src="chess/pieces/wQ.svg">
-                            <img src="chess/pieces/wB.svg">
+                            <p class="material-number" style="font-weight: 600; color: gray;"></p>
+                            <div style="width: 1vw;"></div>
                         </div>
                     </div>
                 </div>
@@ -112,7 +108,7 @@
             <p>we <span style="font-weight: 600;">need</span> your privacy</p>
         </div>
         <div class="cookies-content">
-            <img src="img/cookies.png" alt="" height="300px">
+            <img src="img/cookies.png" alt="" height="70%">
     
             <p>to be able to create the best chess experience we need your privacy</p>
             <button class="read-more">read more</button>
@@ -126,8 +122,8 @@
     <div class="log-in">
         <div class="title">log in</div>
 
-        <input type="text" name="" id="login-username" placeholder="username or gmail" style="margin-top:100px;">
-        <input type="password" name="" id="login-password" placeholder ="password or gmail password" style="margin-top:20px;">
+        <input type="text" name="" id="login-username" placeholder="username or gmail" style="margin-top:10vh;">
+        <input type="password" name="" id="login-password" placeholder ="password or gmail password" style="margin-top:2vh;">
 
         <button id="log-in">log in</button>
 
@@ -138,13 +134,13 @@
         <div class="title">sign up</div>
 
         <p style="color: white;">we <span style="font-weight: 600;">need</span> some information about <span style="font-weight: 600;">you!</span></p>
-        <input type="text" name="" id="full-name" placeholder="full name" style="margin-top:2vh;">
-        <input type="text" name="" id="address" placeholder ="address" style="margin-top:2vh;">
-        <input type="text" name="" id="phone-number" placeholder ="phone number" style="margin-top:2vh;">
-        <input type="text" name="" id="social-security-number" placeholder ="social security number" style="margin-top:2vh;">
-        <input type="text" name="" id="gamertag" placeholder ="gamertag" style="margin-top:2vh;">
-        <input type="text" name="" id="username" placeholder ="username or gmail" style="margin-top:2vh;">
-        <input type="password" name="" id="password" placeholder ="password or gmail password" style="margin-top:2vh;">
+        <input type="text" name="" id="full-name" placeholder="full name" style="margin-top:2vh;" maxlength="40">
+        <input type="text" name="" id="address" placeholder ="address" style="margin-top:2vh;" maxlength="30">
+        <input type="text" name="" id="phone-number" placeholder ="phone number" style="margin-top:2vh;" maxlength="8">
+        <input type="text" name="" id="social-security-number" placeholder ="social security number (ddmmyyxxxxx)" style="margin-top:2vh;" maxlength="11">
+        <input type="text" name="" id="gamertag" placeholder ="gamertag" style="margin-top:2vh;" maxlength="15">
+        <input type="text" name="" id="username" placeholder ="username or gmail" style="margin-top:2vh;" maxlength="15">
+        <input type="password" name="" id="password" placeholder ="password or gmail password" style="margin-top:2vh;" maxlength="15">
 
         <button id="sign-up">sign up</button>
     </div>
@@ -153,7 +149,7 @@
         <div class="title">your new account is ready</div>
 
         <p>assigned elo</p>
-        <p class="assigned-elo" style="font-weight: 600">412</p>
+        <p class="assigned-ELO" style="font-weight: 600">0</p>
 
         <div class="avatar">
             

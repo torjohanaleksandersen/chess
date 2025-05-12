@@ -731,8 +731,8 @@ export class Game {
         img.draggable = false;
         img.src = "chess/pieces/" + pieceName + ".svg";
         const rect = boardDiv.getBoundingClientRect();
-        img.style.height = rect.height * 0.125 + "px";
-        img.style.width = rect.height * 0.125 + "px";
+        //img.style.height = rect.height * 0.125 + "px";
+        //img.style.width = rect.height * 0.125 + "px";
 
         this.handPieceDiv = img;
 
@@ -741,8 +741,8 @@ export class Game {
 
     moveHandPiece(e) {
         if (! this.handPieceDiv) return;
-        this.handPieceDiv.style.top = e.clientY - 50 + "px";
-        this.handPieceDiv.style.left = e.clientX - 50 + "px";
+        this.handPieceDiv.style.top = e.clientY - ((window.innerHeight * 0.08) / 2) + "px";
+        this.handPieceDiv.style.left = e.clientX - ((window.innerHeight * 0.08) / 2) + "px";
     }
 
     removeHandPiece() {

@@ -36,6 +36,35 @@ export class HomeScreenController {
             this.divs.blurContainer.style.display = "none";
             this.divs.signUp.style.display = "none";
         })
+
+        const fullName = document.querySelector("#full-name");
+        fullName.addEventListener("input", () => {
+            fullName.value = fullName.value.replace(/[^a-zA-Z ]/g, '');
+        })
+        const address = document.querySelector("#address");
+        address.addEventListener("input", () => {
+            address.value = address.value.replace(/[^a-zA-Z0-9 ]/g, '');
+        })
+        const phoneNumber = document.querySelector("#phone-number");
+        phoneNumber.addEventListener("input", () => {
+            phoneNumber.value = phoneNumber.value.replace(/[^0-9]/g, '');
+        })
+        const socialSecurityNumber = document.querySelector("#social-security-number");
+        socialSecurityNumber.addEventListener("input", () => {
+            socialSecurityNumber.value = socialSecurityNumber.value.replace(/[^0-9]/g, '');
+        })
+        const gamertag = document.querySelector("#gamertag");
+        gamertag.addEventListener("input", () => {
+            gamertag.value = gamertag.value.replace(/[^a-zA-Z0-9]/g, '');
+        })
+        const username = document.querySelector("#username");
+        username.addEventListener("input", () => {
+            username.value = username.value.replace(/[^a-zA-Z0-9]/g, '');
+        })
+        const password = document.querySelector("#password");
+        password.addEventListener("input", () => {
+            password.value = password.value
+        })
     }
 
     switchScreen(key) {
@@ -79,17 +108,43 @@ export class HomeScreenController {
                 successfull = false;
             }
         }
+
+        if (phoneNumber.value[0] !== '9' && phoneNumber.value[0] !== '4') {
+            phoneNumber.style.borderColor = "red";
+            successfull = false;
+        }
+
+        if (socialSecurityNumber.value.length !== 11) {
+            socialSecurityNumber.style.borderColor = "red";
+            successfull = false;
+        }
+
+        let c = false, n = false, s = false
+        for (const char of password.value) {
+            if (/[a-zA-Z]/.test(char)) c = true;
+            if (/[0-9]/.test(char)) n = true;
+            if (/[^a-zA-Z0-9]/.test(char)) s = true;
+        }
+
+        if (!c || !n || !s || password.value.length < 5) {
+            password.style.borderColor = "red";
+            successfull = false;
+        };
         
         if (!successfull) return;
 
-        socket.emit("create-account", [username.value, password.value]);
+        socket.emit("register-account", {
+            username: username.value, 
+            password: password.value,
+            gamertag: gamertag.value,
+        });
     }
 
     deniedAccount() {
         console.log("denied");
     }
 
-    confirmAccount() {
+    confirmAccount(username) {
         this.divs.createAccount.style.display = "none";
         this.divs.signUp.style.display = "flex";
 
@@ -104,31 +159,34 @@ export class HomeScreenController {
         user.socialSecurityNumber = document.querySelector("#social-security-number").value
         user.gamertag = document.querySelector("#gamertag").value;
 
-        user.setELO();
+        const elo = 400 + Math.floor(Math.pow(Math.random(), 3) * (3000 - 400));
+
+        document.querySelector(".assigned-ELO").innerHTML = elo;
+        user.elo = elo;
 
         socket.emit("set-user-information", {
             avatar: user.avatar,
             gamertag: user.gamertag,
-            ELO: user.ELO
+            elo: user.elo,
+            usernameBuffer: username
         });
-
-
     }
 
     tryLogin() {
         const username = document.querySelector("#login-username").value;
         const password = document.querySelector("#login-password").value;
 
-        socket.emit("request-login", [username, password]);
+        socket.emit("request-login", { username, password });
     }
 
-    loginSuccessful(userData) {
+    loginSuccessful(data) {
         this.divs.blurContainer.style.display = "none";
         this.divs.login.style.display = "none";
 
-        avatar.options = userData.avatar;
-        console.log(userData)
-        user.gamertag = userData.gamertag;
+        avatar.options = data.avatar;
+        console.log(data)
+        user.gamertag = data.gamertag;
+        user.elo = data.elo;
 
         this.setFooterUserData();
     }
@@ -167,7 +225,8 @@ export class HomeScreenController {
         if(!av) return;
 
         document.querySelector("#account-avatar").innerHTML = av;
-        document.querySelector(".gamertag").innerHTML = user.gamertag;
+        document.querySelector("#account-gamertag").innerHTML = user.gamertag;
+        document.querySelector("#account-ELO").innerHTML = user.elo;
     }
 
     getUserAvatar() {
