@@ -2,12 +2,14 @@
 
 
 
+
 export class Cookies {
     constructor () {
         this.div = document.querySelector(".cookies");
         this.blurDiv = document.querySelector(".blur-background");
         this.customizeButtonPosition = {x: 0, y: 0};
         this.initialized = false;
+        this.accepted = false;
 
         this.div.querySelector(".read-more").addEventListener("click", this.readMore);
         this.div.querySelector(".accept").addEventListener("click", () => { this.accept() });
@@ -27,6 +29,8 @@ export class Cookies {
     accept() {
         this.div.style.display = "none";
         this.blurDiv.style.display = "none";
+
+        this.accepted = true;
     }
     
     handleMouseMove(e) {

@@ -24,10 +24,14 @@ export class GameScreenController {
         this.teamColor = "";
     }
 
-    initializeGame() {
+    initializeGame(data) {
         this.divs.you.profile_pic.innerHTML = avatar.Avataaars.create(avatar.options);
         this.divs.you.gamertag.innerHTML = user.gamertag;
-        this.divs.you.ELO.innerHTML = user.ELO;
+        this.divs.you.ELO.innerHTML = user.elo;
+
+        this.divs.opp.profile_pic.innerHTML = avatar.Avataaars.create(data.avatar);
+        this.divs.opp.gamertag.innerHTML = data.gamertag;
+        this.divs.opp.ELO.innerHTML = data.elo;
     }
 
     appendTakenPiece() {

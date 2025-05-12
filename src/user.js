@@ -9,6 +9,7 @@ export class User {
         this.queueTime = 0;
         this.currentGame = {};
 
+
         this.avatar = {};
         this.username = "";
         this.password = "";

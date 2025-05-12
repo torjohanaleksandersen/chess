@@ -31,7 +31,7 @@ document.querySelector("#quick-search").addEventListener("click", () => {
 
 
 
-const cookies = new Cookies();
+export const cookies = new Cookies();
 setTimeout(() => {
     cookies.initiate();
 }, 2000)

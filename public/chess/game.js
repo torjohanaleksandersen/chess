@@ -650,6 +650,7 @@ export class Game {
 
     receivedMove(msgData) {
         this.recolorBoard();
+        
 
         // Extract start and end positions
         const startPos = (msgData >> 6) & 0b111111;  // Extract start position (bits 6-11)

@@ -1,4 +1,4 @@
-import { avatar, user } from "./index.js";
+import { avatar, cookies, user } from "./index.js";
 import { socket } from "./networking.js";
 
 
@@ -55,7 +55,7 @@ export class HomeScreenController {
         })
         const gamertag = document.querySelector("#gamertag");
         gamertag.addEventListener("input", () => {
-            gamertag.value = gamertag.value.replace(/[^a-zA-Z0-9]/g, '');
+            gamertag.value = gamertag.value.replace(/[^a-zA-Z0-9_]/g, '');
         })
         const username = document.querySelector("#username");
         username.addEventListener("input", () => {
@@ -202,6 +202,7 @@ export class HomeScreenController {
     }
 
     home() {
+        if (!cookies.accepted) return;
         this.switchScreen("home");
     }
 

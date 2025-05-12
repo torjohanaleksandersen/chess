@@ -4,6 +4,9 @@
 export class Database {
     constructor () {
         this.users = new Map();
+
+        this.register({ username: "admin", password: "admin", gamertag: "admin", elo: 3400, avatar: {}})
+        this.register({ username: "user", password: "user", gamertag: "user", elo: 1400, avatar: {}})
     }
 
     register({ username, password, gamertag, elo, avatar}) {

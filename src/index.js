@@ -91,8 +91,16 @@ class NetworkManager {
             };
             
             
-            pl1.socket.emit("match-found", { color: "white", roomId: gameRoom.id });
-            pl2.socket.emit("match-found", { color: "black", roomId: gameRoom.id });
+            pl1.socket.emit("match-found", { color: "white", data: {
+                avatar: pl2.avatar,
+                gamertag: pl2.gamertag,
+                elo: pl2.elo
+            } });
+            pl2.socket.emit("match-found", { color: "black", data: {
+                avatar: pl1.avatar,
+                gamertag: pl1.gamertag,
+                elo: pl1.elo
+            } });
 
             pl1.socket.emit("your-turn");
 
