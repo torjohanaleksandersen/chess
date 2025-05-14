@@ -7,6 +7,7 @@ import { searchForGame } from "./networking.js"
 class User {
     constructor () {
         this.inGame = false;
+        this.loggedIn = false;
 
         this.gamertag = "";
         this.fullName = "";
@@ -15,6 +16,7 @@ class User {
         this.socialSecurityNumber = "";
         this.username = "";
         this.elo = 0;
+        this.time = 0;
 
         this.avatar = {};
     }

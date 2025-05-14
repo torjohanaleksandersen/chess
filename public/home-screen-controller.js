@@ -1,5 +1,5 @@
 import { avatar, cookies, user } from "./index.js";
-import { socket } from "./networking.js";
+import { game, searchForGame, socket } from "./networking.js";
 
 
 
@@ -11,7 +11,10 @@ export class HomeScreenController {
             quickSearch: document.querySelector("#quick-search"),
             createAccount: document.querySelector("#create-account"),
             signUp: document.querySelector("#sign-up"),
-            login: document.querySelector("#log-in")
+            login: document.querySelector("#log-in"),
+            draw: document.querySelector(".draw"),
+            resign: document.querySelector(".resign"),
+            leave: document.querySelector(".leave"),
         }
 
         this.divs = {
@@ -27,7 +30,7 @@ export class HomeScreenController {
 
         this.buttons.loginOrSignup.addEventListener("click", () => {this.loginOrSignup()});
         this.buttons.home.addEventListener("click", () => {this.home()});
-        this.buttons.quickSearch.addEventListener("click", () => {this.quickSearch()});
+        this.buttons.quickSearch.addEventListener("click", () => {searchForGame()});
         this.divs.blurContainer.addEventListener("click", () => {this.home()});
         this.buttons.createAccount.addEventListener("click", () => {this.createAccount()});
         this.buttons.signUp.addEventListener("click", () => {this.newAccount()});
@@ -35,6 +38,14 @@ export class HomeScreenController {
         document.querySelector("#done-with-creating-account").addEventListener("click", () => {
             this.divs.blurContainer.style.display = "none";
             this.divs.signUp.style.display = "none";
+        })
+        this.divs.blurContainer.addEventListener("click", () => {
+            if (!cookies.accepted) return;
+
+            this.divs.createAccount.style.display = "none";
+            this.divs.login.style.display = "none";
+            this.divs.signUp.style.display = "none";
+            this.divs.blurContainer.style.display = "none";
         })
 
         const fullName = document.querySelector("#full-name");
@@ -65,6 +76,10 @@ export class HomeScreenController {
         password.addEventListener("input", () => {
             password.value = password.value
         })
+
+        this.buttons.draw.addEventListener("click", () => {this.draw()});
+        this.buttons.resign.addEventListener("click", () => {this.resign()});
+        this.buttons.leave.addEventListener("click", () => {this.leave()});
     }
 
     switchScreen(key) {
@@ -188,6 +203,8 @@ export class HomeScreenController {
         user.gamertag = data.gamertag;
         user.elo = data.elo;
 
+        user.loggedIn = true;
+
         this.setFooterUserData();
     }
 
@@ -204,21 +221,36 @@ export class HomeScreenController {
     home() {
         if (!cookies.accepted) return;
         this.switchScreen("home");
+        user.inGame = false;
     }
 
     newGame() {
         this.switchScreen("game");
     }
 
-    quickSearch() {
+    draw() {
+        console.log("draw")
+    }
+
+    leave() {
+        game.resign();
+        this.home();
+        
+    }
+
+    resign() {
+        game.resign();
+    }
+
+    quickSearch(gamemode = "") {
         this.switchScreen("quickSearch");
 
         const loadingScreen = document.querySelector(".loading-screen-gif");
 
-        const length = 5;
-        const random = Math.floor(Math.random() * length)
-        const src = `animation/loading-${random}.gif`;
+        const src = `animation/loading.gif`;
         loadingScreen.src = src;
+
+        document.querySelector("#searching-gamemode").innerHTML = gamemode;
     }
 
     setFooterUserData() {

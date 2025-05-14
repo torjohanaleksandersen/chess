@@ -399,7 +399,7 @@ footer {
 }
 
 
-.home .title, .log-in-screen .title, .quick-search .title {
+.home .title, .log-in-screen .title {
     height: 10%;
     width: 60%;
     color: white;
@@ -418,13 +418,33 @@ footer {
     justify-content: flex-start;
 }
 
-.quick-search img {
-    height: 60vh;
-    margin-top: 5vh;
+.quick-search .title {
+    height: 10%;
+    width: 60%;
+    color: white;
+    font-size: 7vh;
+    font-weight: 600;
     padding-left: 5%;
+    margin-top: 5%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.quick-search .title img {
+    height: 150%;
+    aspect-ratio: 1 / 1;
+    margin-left: 1vw;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.quick-search #searching-gamemode {
+    font-weight: 100;
+    font-size: 30vh;
+    padding-left: 5%;
+    color: rgb(185, 185, 185);
 }
 
 /* #6EACDA #594435 */
@@ -432,7 +452,7 @@ footer {
 .log-in, .create-account, .new-account {
     height: 70vh;
     width: 30vw;
-    background-color: #594435;
+    background-color: rgb(201, 201, 201) /* #594435 */;
     position: absolute;
     top: 50%;
     left: 50%;
@@ -452,7 +472,7 @@ footer {
 .log-in .title, .create-account .title, .new-account .title {
     height: 20%;
     width: 100%;
-    color: white;
+    color: black;
     font-size: 4vh;
     font-weight: 600;
     display: flex;
@@ -462,10 +482,10 @@ footer {
 
 .log-in input, .create-account input {
     background: none;
-    color: white;
+    color: black;
     outline: none;
     border: none;
-    border-bottom: 1px white solid;
+    border-bottom: 2px black solid;
     font-size: 2vh;
     width: 80%;
     height: 5vh;
@@ -473,7 +493,7 @@ footer {
 
 .log-in #create-account {
     background: none;
-    color: white;
+    color: black;
     border: none;
     height: 30px;
     width: 200px;
@@ -482,7 +502,7 @@ footer {
 }
 
 .create-account button, .log-in #log-in, .new-account button {
-    background:#3b2d24;
+    background:/* #3b2d24 */ rgb(20, 20, 20);
     color: white;
     border: none;
     height: 4vh;
@@ -498,7 +518,7 @@ footer {
 }
 
 .create-account button:hover, .log-in #log-in:hover, .new-account button:hover {
-    background:#221a15;
+    background:black/* #221a15 */;
 }
 
 .avatar {
@@ -515,7 +535,7 @@ footer {
 }
 
 .new-account p {
-    color: white;
+    color: black;
     font-size: 3vh;
 }
 

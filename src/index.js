@@ -12,13 +12,25 @@ import { Database } from "./database.js";
 import { User } from "./user.js";
 
 class GameRoom {
-    constructor () {
+    constructor (timemode) {
         this.id = null;
+
+        const [time, addon] = timemode.split("+");
+        this.time = time;
+        this.addon = addon;
+
+        
+        
         this.players = {
             white: null,
             black: null
         }
         this.turn = "white";
+    }
+
+    start() {
+        this.players.white.time = this.time;
+        this.players.black.time = this.time;
     }
 
     switchTurn() {
@@ -35,6 +47,11 @@ class GameRoom {
                 player.socket.emit("you-win", data);
             }
         }
+
+        this.players.white.gameRoom = {};
+        this.players.black.gameRoom = {};
+        this.players.white.inGame = false;
+        this.players.black.inGame = false;
     }
 }
 
@@ -42,18 +59,21 @@ class NetworkManager {
     constructor() {
         this.users = [];
         this.gameRooms = [];
-        this.queue = [];
+        this.queue = {};
     }
 
     update(dt) {
         this.users.forEach(user => {
-            if (user.searching && !user.inQueue && !user.currentGame?.enemy) {
-                this.queue.push(user);
+
+            if (user.searching && !user.inQueue && !user.inGame && user.searchingGamemode !== "") {
+                if (!this.queue[user.searchingGamemode]) this.queue[user.searchingGamemode] = [];
+                this.queue[user.searchingGamemode].push(user);
                 user.inQueue = true;
                 user.queueTime = 60000;
             }
         })
 
+        /*
         let filteredQueue = [];
         this.queue.forEach(user => {
             user.queueTime -= dt;
@@ -62,51 +82,58 @@ class NetworkManager {
                 filteredQueue.push(user);
             }
         })
+        */
 
-        this.queue = filteredQueue;
+        //this.queue = filteredQueue;
 
-        if (this.queue.length >= 2) {
-            const gameRoom = new GameRoom();
-            gameRoom.id = Math.random() //must change
-            const white = Math.round(Math.random());
-            gameRoom.players.white = this.queue[white];
-            gameRoom.players.black = this.queue[white == 1 ? 0 : 1];
+        for (const gamemode in this.queue) {
+            if (this.queue[gamemode].length >= 2) {
+                const gameRoom = new GameRoom(gamemode);
+                gameRoom.id = Math.random() //must change
+                const white = Math.round(Math.random());
+                gameRoom.players.white = this.queue[gamemode][white];
+                gameRoom.players.black = this.queue[gamemode][white == 1 ? 0 : 1];
 
-            const pl1 = gameRoom.players.white;
-            const pl2 = gameRoom.players.black;
+                const pl1 = gameRoom.players.white;
+                const pl2 = gameRoom.players.black;
 
-            pl1.searching = false;
-            pl1.inQueue = false;
-            pl2.searching = false;
-            pl2.inQueue = false;
+                pl1.searching = false;
+                pl1.inQueue = false;
+                pl1.inGame = true;
+                pl2.searching = false;
+                pl2.inQueue = false;
+                pl2.inGame = true;
 
-            pl1.currentGame = {
-                enemy: pl2,
-                room: gameRoom
-            };
-            
-            pl2.currentGame = {
-                enemy: pl1,
-                room: gameRoom
-            };
-            
-            
-            pl1.socket.emit("match-found", { color: "white", data: {
-                avatar: pl2.avatar,
-                gamertag: pl2.gamertag,
-                elo: pl2.elo
-            } });
-            pl2.socket.emit("match-found", { color: "black", data: {
-                avatar: pl1.avatar,
-                gamertag: pl1.gamertag,
-                elo: pl1.elo
-            } });
+                pl1.currentGame = {
+                    enemy: pl2,
+                    room: gameRoom
+                };
+                
+                pl2.currentGame = {
+                    enemy: pl1,
+                    room: gameRoom
+                };
+                
+                
+                pl1.socket.emit("match-found", { color: "white", data: {
+                    avatar: pl2.avatar,
+                    gamertag: pl2.gamertag,
+                    elo: pl2.elo,
+                    time: gameRoom.time
+                } });
+                pl2.socket.emit("match-found", { color: "black", data: {
+                    avatar: pl1.avatar,
+                    gamertag: pl1.gamertag,
+                    elo: pl1.elo,
+                    time: gameRoom.time
+                } });
 
-            pl1.socket.emit("your-turn");
+                pl1.socket.emit("your-turn");
 
-            this.gameRooms.push(gameRoom);
+                this.gameRooms.push(gameRoom);
 
-            this.queue.splice(0, 2);
+                this.queue[gamemode].splice(0, 2);
+            }
         }
     }
 }
@@ -119,13 +146,19 @@ setInterval(() => {
     networkManager.update(dt);
 }, dt)
 
+setInterval(() => {
+    console.log(database.users);
+}, 1000 * 60 * 60)
+
 
 io.on('connection', socket => {
     const user = new User(socket);
     networkManager.users.push(user);
     socket.on('disconnect', () => {
         networkManager.users = networkManager.users.filter(element => element !== user);
-        networkManager.queue = networkManager.queue.filter(element => element !== user);
+        for (const gamemode in networkManager.queue) {
+            networkManager.queue[gamemode] = networkManager.queue[gamemode].filter(element => element !== user);
+        }
     });
 })
 

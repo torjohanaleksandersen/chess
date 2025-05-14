@@ -37,8 +37,10 @@ socket.on("user-login-result", result => {
 })
 
 
-function searchForGame() {
-    socket.emit("find-game-request");
+function searchForGame(gamemode = "5+0") {
+    //if (!user.loggedIn || user.inGame) return;
+    homeScreenController.quickSearch(gamemode);
+    socket.emit("find-game-request", gamemode);
 }
 
 export { searchForGame };

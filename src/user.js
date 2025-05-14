@@ -5,7 +5,9 @@ export class User {
     constructor (socket) {
         this.socket = socket;
         this.searching = false;
+        this.searchingGamemode = "";
         this.inQueue = false;
+        this.inGame = false;
         this.queueTime = 0;
         this.currentGame = {};
 
@@ -15,9 +17,11 @@ export class User {
         this.password = "";
         this.gamertag = ""; 
         this.elo = 0;
+        this.time = 0;
 
-        this.socket.on("find-game-request", () => {
+        this.socket.on("find-game-request", data => {
             this.searching = true;
+            this.searchingGamemode = data;
         })
 
         this.socket.on("move", data => {
