@@ -227,7 +227,6 @@ export class Game {
 
     //main methods
     drawPieces() {
-        this.removeHandPiece()
         this.forEachSquare((square) => {
             const decodedSquare = square.decode(); // Pass team to decode method
             if (decodedSquare.empty) return;
@@ -262,11 +261,12 @@ export class Game {
                     this.selectPiece(square);
                 } else if (this.selectedSquare && !this.myPiece(square) && this.myTurn) {
                     this.movePiece(square);
-                } else if (this.selectedSquare && this.myTurn) {
+                } else if (this.selectedSquare) {
                     this.selectPiece(square);
                 } else if (this.selectedSquare) {
                     this.selectedSquare = null;
                     this.drawPieces();
+                    this.removeHandPiece();
                     this.recolorBoard();
                     this.removeCircles();
                 }
@@ -279,11 +279,14 @@ export class Game {
                     this.movePiece(square);
                 } else if (this.selectedSquare != square && this.myPiece(square) && this.myTurn) {
                     this.drawPieces();
+                    this.removeHandPiece()
                 } else if (this.selectedSquare == square) {
                     this.drawPieces();
+                    this.removeHandPiece()
                 } else if (this.selectedSquare) {
                     this.selectedSquare = null;
                     this.drawPieces();
+                    this.removeHandPiece()
                     this.recolorBoard();
                     this.removeCircles();
                 }
@@ -342,6 +345,7 @@ export class Game {
         if (!legal) {
             this.selectedSquare = null;
             this.drawPieces();
+            this.removeHandPiece();
             this.recolorBoard();
             this.removeCircles();
             return;
@@ -351,9 +355,9 @@ export class Game {
         this.removeCircles();
         this.sendMove(square, this.selectedSquare);
 
-        this.updateCastlingLogic(this.selectedSquare);
-
         this.handleCastlingOnMove(square);
+
+        this.updateAllowedToCastle(this.selectedSquare);
 
         square.code = this.selectedSquare.code;
         square.div.style.backgroundColor = colors[square.color].yellow;
@@ -363,6 +367,7 @@ export class Game {
         this.selectedSquare = null;
 
         this.drawPieces();
+        this.removeHandPiece();
     }
 
     findLegalMoves() {
@@ -539,8 +544,8 @@ export class Game {
             .map(move => ({ row: move.to.row, col: move.to.col }));
     }
 
-    updateCastlingLogic(sq) {
-        const name = sq.getPieceFromCode()
+    updateAllowedToCastle(sq) {
+        const name = sq.getPieceFromCode();
         if (name !== "R" && name !== "K") return;
 
         if (name === "K") {
@@ -548,12 +553,10 @@ export class Game {
             return;
         }
 
-        const kingsCol = this.team === "white" ? 7 : 0;
-        const queensCol = this.team === "white" ? 0 : 7;
-
-        if (sq.col === kingsCol) {
+        // Rook positions are always the same: 0 (queenside), 7 (kingside)
+        if (sq.col === 7) {
             this.kingsRookMoved = true;
-        } else if (sq.col === queensCol) {
+        } else if (sq.col === 0) {
             this.queensRookMoved = true;
         }
     }
@@ -562,76 +565,100 @@ export class Game {
         if (this.kingMoved) return;
 
         const kingsSq = this.getKingsSquare();
+        const row = 7;
+        const kingSideCol = this.team === "white" ? 6 : 1;
+        const queenSideCol = this.team === "white" ? 2 : 5;
 
         let kingsSideEmpty = true, queensSideEmpty = true;
-        for (let i = kingsSq.col + 1; i < 8 - 1; i ++) {
-            const square = this.getSquare(7, i);
+
+        // Check if squares between king and kingside rook are empty
+        for (let i = kingsSq.col + 1; i < 7; i++) {
+            const square = this.getSquare(row, i);
             if (square.decode().empty === 0) {
                 kingsSideEmpty = false;
                 break;
-            };
-        }
-        if (kingsSideEmpty) {
-            this.legalMoves.push({
-                from: {
-                    row: kingsSq.row,
-                    col: kingsSq.col
-                },
-                to: {
-                    row: kingsSq.row,
-                    col: 6
-                }
-            })
+            }
         }
 
-        for (let i = kingsSq.col - 1; i > 1; i --) {
-            const square = this.getSquare(7, i);
+        if (kingsSideEmpty && !this.kingsRookMoved) {
+            this.legalMoves.push({
+                from: { row: kingsSq.row, col: kingsSq.col },
+                to: { row: kingsSq.row, col: kingSideCol }
+            });
+        }
+
+        // Check if squares between king and queenside rook are empty
+        for (let i = kingsSq.col - 1; i > 0; i--) {
+            const square = this.getSquare(row, i);
             if (square.decode().empty === 0) {
                 queensSideEmpty = false;
                 break;
-            };
+            }
         }
-        if (queensSideEmpty) {
+
+        if (queensSideEmpty && !this.queensRookMoved) {
             this.legalMoves.push({
-                from: {
-                    row: kingsSq.row,
-                    col: kingsSq.col
-                },
-                to: {
-                    row: kingsSq.row,
-                    col: 2
-                }
-            })
+                from: { row: kingsSq.row, col: kingsSq.col },
+                to: { row: kingsSq.row, col: queenSideCol }
+            });
         }
     }
 
     handleCastlingOnMove(square) {
-        if (this.selectedSquare === this.getKingsSquare() && (square.row === 7 && square.col === 6)) {
+        if (this.kingMoved) return;
 
-            const kingsRookSaved = this.board[7][7].code;
-            this.board[7][7].code = 0b00000;
-            this.board[7][7].div.innerHTML = "";
-            this.board[7][5].code = kingsRookSaved;
-        } else if (this.selectedSquare === this.getKingsSquare() && (square.row === 7 && square.col === 2)) {
+        const row = 7;
+        const isKingSquare = this.selectedSquare === this.getKingsSquare();
 
-            const queensRookSaved = this.board[7][0].code;
-            this.board[7][0].code = 0b00000;
-            this.board[7][0].div.innerHTML = "";
-            this.board[7][3].code = queensRookSaved;
+        const kingSideCol = this.team === "white" ? 6 : 1;
+        const queenSideCol = this.team === "white" ? 2 : 5;
+
+        const kingSideRookCol = this.team === "white" ? 5 : 2;
+        const queenSideRookCol = this.team === "white" ? 3 : 4;
+
+        const kingSideRook = this.team === "white" ? 7 : 0;
+        const queenSideRook = this.team === "white" ? 0 : 7;
+
+        if (isKingSquare && square.row === row && square.col === kingSideCol) {
+            // King-side castling
+            const rook = this.board[row][kingSideRook].code;
+            this.board[row][kingSideRook].code = 0b00000;
+            this.board[row][kingSideRook].div.innerHTML = "";
+            this.board[row][kingSideRookCol].code = rook;
+        } else if (isKingSquare && square.row === row && square.col === queenSideCol) {
+            // Queen-side castling
+            const rook = this.board[row][queenSideRook].code;
+            this.board[row][queenSideRook].code = 0b00000;
+            this.board[row][queenSideRook].div.innerHTML = "";
+            this.board[row][queenSideRookCol].code = rook;
         }
     }
 
     handleCastlingOnReceivingMove(startSq, endSq) {
         if (startSq.getPieceFromCode() !== "K") return;
+        if (Math.abs(startSq.col - endSq.col) < 2) return;
 
-        const startCol = this.team === "white" ? 4 : 3;
+        const row = 0;
+        let rookStartCol, rookEndCol;
 
-        /*
-        if (startSq === this.getSquare(0, startCol) && endSq === this.getSquare(0, endCol)) {
+        if (endSq.col === (this.team === "white" ? 6 : 1)) {
+            // King-side castling
+            rookStartCol = (this.team === "white" ? 7 : 0);
+            rookEndCol = (this.team === "white" ? 5 : 2);
+        } else if (endSq.col === (this.team === "white" ? 2 : 5)) {
+            // Queen-side castling
+            rookStartCol = (this.team === "white" ? 0 : 7);
+            rookEndCol = (this.team === "white" ? 3 : 4);
+        } else {
+            return;
+        }
 
-        } else if (endCol === this.getSquare(0, ))
-        */
+        const rook = this.board[row][rookStartCol].code;
+        this.board[row][rookStartCol].code = 0b00000;
+        this.board[row][rookStartCol].div.innerHTML = "";
+        this.board[row][rookEndCol].code = rook;
     }
+
     
 
     //networking
@@ -649,6 +676,7 @@ export class Game {
     }
 
     receivedMove(msgData) {
+        this.legalMoves = [];
         this.recolorBoard();
         
 
@@ -667,6 +695,11 @@ export class Game {
         // Get the square objects
         const fromSq = this.getSquare(fromRow, fromCol);
         const toSq = this.getSquare(toRow, toCol);
+
+        if (this.selectedSquare === toSq) {
+            this.selectedSquare = null;
+            this.removeCircles();
+        }
 
         this.handleCastlingOnReceivingMove(fromSq, toSq);
     
